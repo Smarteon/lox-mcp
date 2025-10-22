@@ -1,4 +1,4 @@
-package cz.smarteon.lox.mcp
+package cz.smarteon.loxmcp
 
 /**
  * Application-wide constants.
@@ -15,4 +15,3 @@ object Constants {
      */
     const val SERVER_NAME = "lox-mcp-server"
 }
-

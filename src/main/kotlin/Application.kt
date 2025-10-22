@@ -1,8 +1,7 @@
-package cz.smarteon.lox.mcp
+package cz.smarteon.loxmcp
 
-import cz.smarteon.lox.mcp.loxone.LoxoneAdapter
-import cz.smarteon.lox.mcp.mcp.createMcpServer
-import cz.smarteon.lox.mcp.mcp.createStdioMcpServer
+import cz.smarteon.loxmcp.server.createMcpServer
+import cz.smarteon.loxmcp.server.createStdioMcpServer
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
 import io.ktor.server.engine.*

@@ -1,6 +1,6 @@
-package cz.smarteon.lox.mcp.mcp
+package cz.smarteon.loxmcp.server
 
-import cz.smarteon.lox.mcp.loxone.LoxoneAdapter
+import cz.smarteon.loxmcp.LoxoneAdapter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.modelcontextprotocol.kotlin.sdk.*
 import io.modelcontextprotocol.kotlin.sdk.server.Server

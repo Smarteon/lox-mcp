@@ -1,12 +1,10 @@
-package cz.smarteon.lox.mcp.loxone
+package cz.smarteon.loxmcp
 
 import cz.smarteon.loxkt.LoxoneAuth
 import cz.smarteon.loxkt.LoxoneClient
 import cz.smarteon.loxkt.LoxoneEndpoint
 import cz.smarteon.loxkt.ktor.KtorHttpLoxoneClient
 import io.github.oshai.kotlinlogging.KotlinLogging
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
 
 private val logger = KotlinLogging.logger {}
 
