@@ -8,6 +8,8 @@ on:
 jobs:
   conventional-commits:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
     env:
       HEAD_REF:  ${{ github.head_ref }}
     steps:
