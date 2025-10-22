@@ -162,11 +162,10 @@ Read-only resource providing Miniserver connection status and API information.
 
 ```
 lox-mcp/
-├── src/main/kotlin/cz/smarteon/lox/mcp/
+├── src/main/kotlin/
 │   ├── Application.kt              # Main entry point, server initialization
-│   ├── loxone/
-│   │   └── LoxoneAdapter.kt        # Loxone Miniserver client wrapper
-│   └── mcp/
+│   ├── LoxoneAdapter.kt            # Loxone Miniserver client wrapper
+│   └── server/
 │       ├── McpServer.kt            # MCP server setup (STDIO & HTTP/SSE)
 │       ├── ToolsRegistry.kt        # MCP tools registration
 │       └── ResourcesRegistry.kt    # MCP resources registration
