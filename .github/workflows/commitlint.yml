@@ -1,0 +1,112 @@
+name: Commitlint
+
+# This workflow is integrated into required-status-checks.yml
+# Keeping it for manual triggers only
+on:
+  workflow_call:
+
+jobs:
+  conventional-commits:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      HEAD_REF:  ${{ github.head_ref }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          fetch-tags: false
+
+      - name: Fetch base branch
+        run: |
+          BASE_BRANCH="main"
+          echo "Fetching base branch: $BASE_BRANCH"
+          git fetch origin $BASE_BRANCH:$BASE_BRANCH
+          git branch -r
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24.8.0'
+
+      - name: Install commitlint
+        run: |
+          npm init -y
+          npm install --save-dev @commitlint/cli @commitlint/config-conventional
+
+      - name: Create commitlint config
+        run: |
+          echo "Using default conventional commits config"
+          echo 'module.exports = { extends: ["@commitlint/config-conventional"] };' > commitlint.config.js
+
+      - name: Check conventional commits
+        id: check-commits
+        run: |
+          # Get the base branch name
+          BASE_BRANCH="main"
+          
+          echo "Base branch: $BASE_BRANCH"
+          echo "Head ref: $HEAD_REF"
+          echo "Base ref: ${{ github.base_ref }}"
+          
+          # Check if there are any commits in the PR
+          COMMIT_COUNT=$(git rev-list --count origin/$BASE_BRANCH..HEAD)
+          
+          if [ "$COMMIT_COUNT" -eq 0 ]; then
+            echo "No commits found in PR"
+            exit 0
+          fi
+          
+          echo "Checking $COMMIT_COUNT commits against conventional commit format..."
+          
+          # Use commitlint to check all commits in the range
+          if npx commitlint --from origin/$BASE_BRANCH --to HEAD --verbose; then
+            echo "✅ All $COMMIT_COUNT commits follow conventional commit format"
+          else
+            echo "❌ Conventional commit violations found in $COMMIT_COUNT commits"
+            echo "Please ensure all commit messages follow the Conventional Commits specification: https://www.conventionalcommits.org/"
+          
+            exit 1
+          fi
+
+      - name: Write job summary
+        if: always()
+        run: |
+          echo "## Conventional Commits Validation Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          
+          VALIDATION_RESULT="${{ steps.check-commits.outputs.validation_result }}"
+          TOTAL_COMMITS="${{ steps.check-commits.outputs.total_commits }}"
+          VIOLATION_COUNT="${{ steps.check-commits.outputs.violation_count }}"
+          HAS_VIOLATIONS="${{ steps.check-commits.outputs.has_violations }}"
+          
+          if [ "$VALIDATION_RESULT" = "no_commits" ]; then
+            echo "ℹ️ **No commits found in PR**" >> $GITHUB_STEP_SUMMARY
+          elif [ "$VALIDATION_RESULT" = "success" ]; then
+            echo "✅ **All $TOTAL_COMMITS commits follow conventional commit format**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total Commits | $TOTAL_COMMITS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Valid Commits | $TOTAL_COMMITS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Violations | 0 |" >> $GITHUB_STEP_SUMMARY
+            echo "| Status | ✅ Passed |" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "❌ **Conventional commit violations found**" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Total Commits | $TOTAL_COMMITS |" >> $GITHUB_STEP_SUMMARY
+            echo "| Violations | $VIOLATION_COUNT |" >> $GITHUB_STEP_SUMMARY
+            echo "| Status | ❌ Failed |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "### Next Steps" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Please ensure all commit messages follow the [Conventional Commits](https://www.conventionalcommits.org/) specification." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Valid types:** \`feat\`, \`fix\`, \`docs\`, \`style\`, \`refactor\`, \`perf\`, \`test\`, \`build\`, \`ci\`, \`chore\`, \`revert\`" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "**Example:** \`feat(auth): add user login functionality\`" >> $GITHUB_STEP_SUMMARY
+          fi
