@@ -1,58 +1,45 @@
 package cz.smarteon.loxmcp.server
 
 import cz.smarteon.loxmcp.LoxoneAdapter
+import cz.smarteon.loxmcp.config.ConfigLoader
+import cz.smarteon.loxmcp.config.ResourceConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.modelcontextprotocol.kotlin.sdk.*
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 
 private val logger = KotlinLogging.logger {}
 
 /**
  * Registers all MCP resources that expose Loxone data to AI assistants.
+ * Resources are loaded from YAML configuration for easy customization.
  */
 fun registerResources(server: Server, adapter: LoxoneAdapter) {
-    server.addResource(
-        uri = "lox://status", name = "Loxone Server Status", description = """
-            Basic status information about the Loxone Miniserver connection.
-            Use this to verify the system is accessible before calling tools.
-        """.trimIndent(), mimeType = "text/plain"
-    ) { request ->
-        try {
-            val apiVersion = adapter.getApiVersion()
+    val config = ConfigLoader.loadFromResources()
 
-            ReadResourceResult(
-                contents = listOf(
-                    TextResourceContents(
-                        uri = request.uri, mimeType = "text/plain", text = """
-                                Loxone Miniserver Status
-                                ========================
-                                
-                                Connection: Active
-                                API Version: $apiVersion
-                                
-                                The Miniserver is online and responding to requests.
-                            """.trimIndent()
-                    )
-                )
-            )
-        } catch (e: Exception) {
-            logger.error(e) { "Failed to get server status" }
-
-            ReadResourceResult(
-                contents = listOf(
-                    TextResourceContents(
-                        uri = request.uri, mimeType = "text/plain", text = """
-                                Loxone Miniserver Status
-                                ========================
-                                
-                                Connection: Error
-                                Message: ${e.message}
-                                
-                                The Miniserver is not accessible.
-                            """.trimIndent()
-                    )
-                )
-            )
+    if (config.resources.isEmpty()) {
+        logger.warn { "No resources defined in configuration" }
+    } else {
+        logger.info { "Registering ${config.resources.size} resources from configuration" }
+        config.resources.forEach { resourceConfig ->
+            registerResource(server, adapter, resourceConfig)
         }
     }
+}
+
+/**
+ * Register a single resource from configuration.
+ * Resources with URI patterns like {roomName} will be matched dynamically.
+ */
+private fun registerResource(server: Server, adapter: LoxoneAdapter, resourceConfig: ResourceConfig) {
+    val handler = DynamicResourceHandler(adapter, resourceConfig)
+
+    server.addResource(
+        uri = resourceConfig.uri,
+        name = resourceConfig.name,
+        description = resourceConfig.description,
+        mimeType = resourceConfig.mimeType
+    ) { request ->
+        handler.handle(request.uri)
+    }
+
+    logger.debug { "Registered resource: ${resourceConfig.uri}" }
 }
