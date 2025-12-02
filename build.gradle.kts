@@ -14,7 +14,7 @@ repositories {
 }
 
 dependencies {
-    implementation("cz.smarteon.loxone:loxone-client-kotlin-jvm:0.5.1")
+    implementation("cz.smarteon.loxone:loxone-client-kotlin-jvm:0.6.0")
     implementation("io.modelcontextprotocol:kotlin-sdk:0.7.2")
 
     implementation(libs.ktor.server.core)
@@ -25,6 +25,7 @@ dependencies {
     implementation(libs.kotlinx.coroutines.core)
 
     implementation(libs.kotlinx.serialization.json)
+    implementation(libs.kaml)
 
     implementation(libs.kotlin.logging)
     implementation(libs.slf4j.simple)
@@ -35,9 +36,9 @@ dependencies {
 }
 
 kotlin {
-    jvmToolchain(17)
+    jvmToolchain(21)
     compilerOptions {
-        jvmTarget.set(JvmTarget.JVM_17)
+        jvmTarget.set(JvmTarget.JVM_21)
     }
 }
 
@@ -46,5 +47,5 @@ tasks.test {
 }
 
 application {
-    mainClass.set("cz.smarteon.lox.mcp.ApplicationKt")
+    mainClass.set("cz.smarteon.loxmcp.ApplicationKt")
 }
