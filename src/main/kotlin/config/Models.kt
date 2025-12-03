@@ -57,4 +57,3 @@ data class ResourceConfig(
 data class ResourceHandler(
     val type: String
 )
-

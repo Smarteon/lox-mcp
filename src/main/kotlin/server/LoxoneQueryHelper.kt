@@ -85,4 +85,3 @@ object LoxoneQueryHelper {
         return getVisibleControlsForCategory(categoryUuid).size
     }
 }
-

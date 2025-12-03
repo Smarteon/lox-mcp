@@ -19,14 +19,7 @@ object ConfigLoader {
         val file = File(filePath)
 
         return if (file.exists()) {
-            try {
-                logger.info { "Loading MCP configuration from $filePath" }
-                val yamlContent = file.readText()
-                Yaml.default.decodeFromString(McpConfig.serializer(), yamlContent)
-            } catch (e: Exception) {
-                logger.error(e) { "Failed to load configuration from $filePath, using defaults" }
-                McpConfig()
-            }
+            parseYaml(file.readText(), "file $filePath")
         } else {
             logger.warn { "Configuration file not found at $filePath, using defaults" }
             McpConfig()
@@ -37,20 +30,24 @@ object ConfigLoader {
      * Load configuration from classpath resources.
      */
     fun loadFromResources(resourcePath: String = "mcp-config.yaml"): McpConfig {
+        val resourceStream = ConfigLoader::class.java.classLoader.getResourceAsStream(resourcePath)
+
+        return if (resourceStream != null) {
+            val yamlContent = resourceStream.bufferedReader().use { it.readText() }
+            parseYaml(yamlContent, "resources: $resourcePath")
+        } else {
+            logger.warn { "Configuration resource not found: $resourcePath, using defaults" }
+            McpConfig()
+        }
+    }
+
+    private fun parseYaml(yamlContent: String, source: String): McpConfig {
         return try {
-            val resourceStream = ConfigLoader::class.java.classLoader.getResourceAsStream(resourcePath)
-            if (resourceStream != null) {
-                logger.info { "Loading MCP configuration from resources: $resourcePath" }
-                val yamlContent = resourceStream.bufferedReader().use { it.readText() }
-                Yaml.default.decodeFromString(McpConfig.serializer(), yamlContent)
-            } else {
-                logger.warn { "Configuration resource not found: $resourcePath, using defaults" }
-                McpConfig()
-            }
+            logger.info { "Loading MCP configuration from $source" }
+            Yaml.default.decodeFromString(McpConfig.serializer(), yamlContent)
         } catch (e: Exception) {
-            logger.error(e) { "Failed to load configuration from resources: $resourcePath, using defaults" }
+            logger.error(e) { "Failed to load configuration from $source, using defaults" }
             McpConfig()
         }
     }
 }
-

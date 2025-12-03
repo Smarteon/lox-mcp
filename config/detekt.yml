@@ -1,0 +1,65 @@
+build:
+  maxIssues: 40
+
+config:
+  validation: true
+
+complexity:
+  active: true
+  LongMethod:
+    active: true
+    threshold: 60
+  LongParameterList:
+    active: true
+    functionThreshold: 6
+  NestedBlockDepth:
+    active: true
+    threshold: 4
+  TooManyFunctions:
+    active: false
+
+coroutines:
+  active: true
+  RedundantSuspendModifier:
+    active: true
+  SleepInsteadOfDelay:
+    active: true
+
+exceptions:
+  active: true
+  PrintStackTrace:
+    active: true
+  RethrowCaughtException:
+    active: true
+
+naming:
+  active: true
+  FunctionNaming:
+    active: true
+  ClassNaming:
+    active: true
+  PackageNaming:
+    active: true
+
+potential-bugs:
+  active: true
+  DuplicateCaseInWhenExpression:
+    active: true
+  EqualsAlwaysReturnsTrueOrFalse:
+    active: true
+  UnsafeCallOnNullableType:
+    active: true
+  UnreachableCode:
+    active: true
+
+style:
+  active: true
+  MagicNumber:
+    active: false
+  MaxLineLength:
+    active: true
+    maxLineLength: 140
+  OptionalUnit:
+    active: false
+  UnnecessaryParentheses:
+    active: true

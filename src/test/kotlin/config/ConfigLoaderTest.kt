@@ -167,4 +167,3 @@ class ConfigLoaderTest : ShouldSpec({
         }
     }
 })
-

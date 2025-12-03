@@ -173,4 +173,3 @@ resources:
     mimeType: application/json
     handler:
       type: categories_list
-

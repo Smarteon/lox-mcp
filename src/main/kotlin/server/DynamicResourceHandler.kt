@@ -1,6 +1,7 @@
 package cz.smarteon.loxmcp.server
 
 import cz.smarteon.loxkt.app.getVisibleControls
+import cz.smarteon.loxmcp.Constants.HandlerTypes
 import cz.smarteon.loxmcp.LoxoneAdapter
 import cz.smarteon.loxmcp.config.ResourceConfig
 import cz.smarteon.loxmcp.server.LoxoneQueryHelper.buildDeviceJson
@@ -36,13 +37,13 @@ class DynamicResourceHandler(
     suspend fun handle(uri: String): ReadResourceResult {
         return try {
             when (resourceConfig.handler.type) {
-                "rooms_list" -> handleRoomsList()
-                "room_devices" -> handleRoomDevices(uri)
-                "devices_all" -> handleDevicesAll()
-                "devices_by_type" -> handleDevicesByType(uri)
-                "devices_by_category" -> handleDevicesByCategory(uri)
-                "categories_list" -> handleCategoriesList()
-                "structure_summary" -> handleStructureSummary()
+                HandlerTypes.ROOMS_LIST -> handleRoomsList()
+                HandlerTypes.ROOM_DEVICES -> handleRoomDevices(uri)
+                HandlerTypes.DEVICES_ALL -> handleDevicesAll()
+                HandlerTypes.DEVICES_BY_TYPE -> handleDevicesByType(uri)
+                HandlerTypes.DEVICES_BY_CATEGORY -> handleDevicesByCategory(uri)
+                HandlerTypes.CATEGORIES_LIST -> handleCategoriesList()
+                HandlerTypes.STRUCTURE_SUMMARY -> handleStructureSummary()
                 else -> errorResult(uri, "Unknown handler type: ${resourceConfig.handler.type}")
             }
         } catch (e: Exception) {
