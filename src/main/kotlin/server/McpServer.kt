@@ -4,11 +4,14 @@ import cz.smarteon.loxmcp.Constants
 import cz.smarteon.loxmcp.LoxoneAdapter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.*
-import io.modelcontextprotocol.kotlin.sdk.*
+import io.ktor.utils.io.*
+import io.modelcontextprotocol.kotlin.sdk.Implementation
+import io.modelcontextprotocol.kotlin.sdk.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
 import io.modelcontextprotocol.kotlin.sdk.server.mcp
+import kotlinx.coroutines.awaitCancellation
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
@@ -47,7 +50,13 @@ suspend fun createStdioMcpServer(adapter: LoxoneAdapter) {
     )
     server.connect(transport)
 
-    logger.info { "Loxone MCP Server started in STDIO mode" }
+    try {
+        logger.info { "Loxone MCP Server started in STDIO mode" }
+        awaitCancellation()
+    } catch (e: CancellationException) {
+        logger.info { "STDIO server cancelled, shutting down" }
+        throw e
+    }
 }
 
 /**

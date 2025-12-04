@@ -1,0 +1,175 @@
+# MCP Tools and Resources Configuration
+# This file defines the tools and resources exposed by the Loxone MCP server
+
+tools:
+  # Basic device control
+  - name: control_device
+    description: |
+      Controls a specific Loxone device by its UUID.
+      Supports actions like on, off, toggle, up, down, stop.
+    parameters:
+      - name: device_id
+        type: string
+        description: The UUID of the device to control
+        required: true
+      - name: action
+        type: string
+        description: Action to perform (on, off, toggle, up, down, stop)
+        required: true
+        enum: [ "on", "off", "toggle", "up", "down", "stop" ]
+      - name: value
+        type: number
+        description: Optional value for the action (e.g., brightness level, position)
+        required: false
+    handler:
+      type: control_device
+
+  # Room-based control
+  - name: control_devices_by_room
+    description: |
+      Controls all devices of a specific type in a room.
+      Useful for "turn off all lights in the kitchen" type commands.
+    parameters:
+      - name: room
+        type: string
+        description: Name of the room (e.g., "Kitchen", "Living Room")
+        required: true
+      - name: action
+        type: string
+        description: Action to perform on all devices
+        required: true
+        enum: [ "on", "off", "up", "down", "stop" ]
+      - name: device_type
+        type: string
+        description: Optional device type filter (e.g., "Switch", "Dimmer", "Jalousie")
+        required: false
+    handler:
+      type: control_devices_by_room
+
+  # Type-based control
+  - name: control_devices_by_type
+    description: |
+      Controls all devices of a specific type across the entire system.
+      For example, "turn off all lights" or "close all blinds".
+    parameters:
+      - name: device_type
+        type: string
+        description: Type of devices to control (e.g., "Switch", "Dimmer", "Jalousie")
+        required: true
+      - name: action
+        type: string
+        description: Action to perform on all matching devices
+        required: true
+        enum: [ "on", "off", "up", "down", "stop" ]
+    handler:
+      type: control_devices_by_type
+
+  # Category-based control
+  - name: control_devices_by_category
+    description: |
+      Controls all devices in a specific category (e.g., lighting, blinds).
+      Categories group related devices across different rooms.
+    parameters:
+      - name: category
+        type: string
+        description: Category name (use the structure resource to see available categories)
+        required: true
+      - name: action
+        type: string
+        description: Action to perform on all devices in the category
+        required: true
+        enum: [ "on", "off", "up", "down", "stop" ]
+    handler:
+      type: control_devices_by_category
+
+  # Raw command for advanced control
+  - name: send_command
+    description: |
+      Send a raw command to a device by UUID.
+      This is an advanced tool for commands not covered by other tools.
+    parameters:
+      - name: uuid
+        type: string
+        description: The UUID of the device
+        required: true
+      - name: command
+        type: string
+        description: The raw command to send (e.g., "On", "Off", "50" for dimmer)
+        required: true
+    handler:
+      type: send_command
+
+resources:
+  # Structure summary
+  - uri: loxone://structure/summary
+    name: Loxone Structure Summary
+    description: |
+      Overview of the entire Loxone system structure.
+      Shows counts and lists of all rooms, devices, and categories.
+      Start here to understand what's available in the system.
+    mimeType: application/json
+    handler:
+      type: structure_summary
+
+  # All rooms
+  - uri: loxone://rooms
+    name: All Rooms
+    description: |
+      List of all rooms in the Loxone system.
+      Each room includes its UUID, name, and device count.
+    mimeType: application/json
+    handler:
+      type: rooms_list
+
+  # Room devices (pattern-based URI)
+  - uri: loxone://rooms/{roomName}/devices
+    name: Room Devices
+    description: |
+      List all devices in a specific room.
+      Replace {roomName} with the actual room name from the rooms list.
+      Example: loxone://rooms/Kitchen/devices
+    mimeType: application/json
+    handler:
+      type: room_devices
+
+  # All devices
+  - uri: loxone://devices/all
+    name: All Devices
+    description: |
+      Complete list of all devices in the system.
+      Includes UUID, name, type, room, and category for each device.
+    mimeType: application/json
+    handler:
+      type: devices_all
+
+  # Devices by type (pattern-based URI)
+  - uri: loxone://devices/type/{deviceType}
+    name: Devices by Type
+    description: |
+      List all devices of a specific type.
+      Common types: Switch, Dimmer, Jalousie, IRoomControllerV2, AnalogInput
+      Example: loxone://devices/type/Switch
+    mimeType: application/json
+    handler:
+      type: devices_by_type
+
+  # Devices by category (pattern-based URI)
+  - uri: loxone://devices/category/{categoryName}
+    name: Devices by Category
+    description: |
+      List all devices in a specific category.
+      Use the categories list resource to see available categories.
+      Example: loxone://devices/category/Lights
+    mimeType: application/json
+    handler:
+      type: devices_by_category
+
+  # All categories
+  - uri: loxone://categories
+    name: All Categories
+    description: |
+      List of all categories in the Loxone system.
+      Categories group related devices (lights, blinds, climate, etc.)
+    mimeType: application/json
+    handler:
+      type: categories_list

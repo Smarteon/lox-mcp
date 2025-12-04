@@ -2,7 +2,9 @@ package cz.smarteon.loxmcp
 
 import cz.smarteon.loxkt.LoxoneAuth
 import cz.smarteon.loxkt.LoxoneClient
+import cz.smarteon.loxkt.LoxoneCommands
 import cz.smarteon.loxkt.LoxoneEndpoint
+import cz.smarteon.loxkt.app.LoxoneApp
 import cz.smarteon.loxkt.ktor.KtorHttpLoxoneClient
 import io.github.oshai.kotlinlogging.KotlinLogging
 
@@ -18,6 +20,7 @@ class LoxoneAdapter(
     private val password: String
 ) {
     private var client: LoxoneClient? = null
+    private var cachedApp: LoxoneApp? = null
 
     /**
      * Lazily initializes and returns the HTTP client.
@@ -43,10 +46,35 @@ class LoxoneAdapter(
     }
 
     /**
+     * Get the LoxoneApp structure file.
+     * This contains all rooms, controls, and categories.
+     * Results are cached after first retrieval.
+     */
+    suspend fun getApp(): LoxoneApp {
+        cachedApp?.let { return it }
+
+        logger.info { "Fetching LoxoneApp structure from Miniserver" }
+        val app = getClient().call(LoxoneCommands.App.get())
+        cachedApp = app
+
+        logger.info { "LoxoneApp cached: lastModified=${app.lastModified}" }
+        return app
+    }
+
+
+    /**
      * Execute a raw command string on the Loxone Miniserver.
      */
     suspend fun callRaw(command: String): String {
         return getClient().callRaw(command)
+    }
+
+    /**
+     * Send a command to control a device by UUID.
+     */
+    suspend fun sendCommand(uuid: String, command: String): String {
+        logger.debug { "Sending command '$command' to device $uuid" }
+        return getClient().callRaw("jdev/sps/io/$uuid/$command")
     }
 
     /**
@@ -55,6 +83,7 @@ class LoxoneAdapter(
     suspend fun close() {
         client?.close()
         client = null
+        cachedApp = null
         logger.info { "Disconnected from Loxone Miniserver" }
     }
 }
