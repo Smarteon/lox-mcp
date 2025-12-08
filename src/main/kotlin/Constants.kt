@@ -6,9 +6,17 @@ package cz.smarteon.loxmcp
 object Constants {
     /**
      * The version of the Loxone MCP Server.
-     * This should match the version in build.gradle.kts (without -SNAPSHOT suffix).
+     * Automatically loaded from the build-generated version file.
      */
-    const val VERSION = "0.1.0"
+    val VERSION: String by lazy {
+        Constants::class.java.classLoader
+            .getResourceAsStream(VERSION_FILE_NAME)
+            ?.bufferedReader()
+            ?.use { it.readText().trim() }
+            ?: "unknown"
+    }
+
+    const val VERSION_FILE_NAME = "version.txt"
 
     /**
      * The name of the MCP server implementation.

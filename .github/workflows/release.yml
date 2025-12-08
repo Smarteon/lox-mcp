@@ -1,0 +1,73 @@
+name: Release
+
+on:
+  workflow_dispatch:
+    inputs:
+      versionIncrement:
+        description: "What version number to increment"
+        required: true
+        type: choice
+        default: incrementPatch
+        options:
+          - incrementPatch
+          - incrementMinor
+          - incrementMajor
+
+jobs:
+  release:
+    permissions:
+      contents: write
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: master
+          token: ${{ secrets.SMARTEON_GIT_TOKEN }}
+
+      - name: Setup JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          overwrite-settings: false
+
+      - name: Set up git configuration
+        run: |
+          git config --global user.name 'Smarteon Git'
+          git config --global user.email 'accounts+git@smarteon.cz'
+
+      - name: Setup Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          cache-encryption-key: ${{ secrets.GRADLE_ENCRYPTION_KEY }}
+
+      - name: Release and push tag
+        shell: bash
+        run: |
+          # Fetch a full copy of the repo, as required by release plugin:
+          git fetch --tags --unshallow
+          # Run release:
+          ./gradlew release -Prelease.versionIncrementer=${{ inputs.versionIncrement }} --configuration-cache
+
+      - name: Get version
+        id: version
+        shell: bash
+        run: |
+          VERSION=$(git describe --tags --abbrev=0 | sed 's/^v//')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Released version: $VERSION"
+
+      - name: Build fat JAR
+        shell: bash
+        run: |
+          ./gradlew shadowJar
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: Release ${{ steps.version.outputs.version }}
+          generate_release_notes: true
+          files: build/libs/lox-mcp-${{ steps.version.outputs.version }}-all.jar
+        env:
+          GITHUB_TOKEN: ${{ secrets.SMARTEON_GIT_TOKEN }}
