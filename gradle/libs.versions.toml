@@ -28,3 +28,5 @@ mockk = { module = "io.mockk:mockk", version = "1.13.14" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 detekt = { id = "io.gitlab.arturbosch.detekt", version.ref = "detekt" }
+shadow = { id = "com.gradleup.shadow", version = "9.3.0" }
+axion-release = { id = "pl.allegro.tech.build.axion-release", version = "1.21.1" }

@@ -1,15 +1,24 @@
 import org.jetbrains.kotlin.gradle.dsl.JvmTarget
 import io.gitlab.arturbosch.detekt.Detekt
+import com.github.jengelman.gradle.plugins.shadow.tasks.ShadowJar
 
 plugins {
     alias(libs.plugins.kotlin.jvm)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.detekt)
+    alias(libs.plugins.shadow)
+    alias(libs.plugins.axion.release)
     application
 }
 
+scmVersion {
+    tag {
+        prefix.set("v")
+    }
+}
+
 group = "cz.smarteon.lox.mcp"
-version = "0.1.0-SNAPSHOT"
+version = scmVersion.version
 
 repositories {
     mavenCentral()
@@ -38,23 +47,6 @@ dependencies {
     testImplementation(libs.ktor.server.test.host)
 }
 
-detekt {
-    config.setFrom("$projectDir/config/detekt.yml")
-    buildUponDefaultConfig = true
-    allRules = false
-}
-
-tasks.withType<Detekt>().configureEach {
-    reports {
-        html.required.set(true)
-        xml.required.set(false)
-        txt.required.set(false)
-        sarif.required.set(false)
-        md.required.set(false)
-    }
-    jvmTarget = "21"
-}
-
 kotlin {
     jvmToolchain(21)
     compilerOptions {
@@ -62,10 +54,64 @@ kotlin {
     }
 }
 
-tasks.test {
-    useJUnitPlatform()
+detekt {
+    config.setFrom("$projectDir/config/detekt.yml")
+    buildUponDefaultConfig = true
+    allRules = false
 }
 
 application {
     mainClass.set("cz.smarteon.loxmcp.ApplicationKt")
+}
+
+tasks {
+    val generateVersionFile by registering {
+        val versionValue = version.toString()
+        val outputDir = layout.buildDirectory.dir("generated/sources/version")
+
+        inputs.property("version", versionValue)
+        outputs.dir(outputDir)
+
+        doLast {
+            val versionFile = outputDir.get().file("version.txt").asFile
+            versionFile.parentFile.mkdirs()
+            versionFile.writeText(inputs.properties["version"] as String)
+        }
+    }
+
+    withType<ShadowJar>().configureEach {
+        dependsOn(generateVersionFile)
+        archiveBaseName.set("lox-mcp")
+        archiveClassifier.set("all")
+        mergeServiceFiles()
+        manifest {
+            attributes["Main-Class"] = application.mainClass.get()
+        }
+    }
+
+    withType<Detekt>().configureEach {
+        reports {
+            html.required.set(true)
+            xml.required.set(false)
+            txt.required.set(false)
+            sarif.required.set(false)
+            md.required.set(false)
+        }
+        jvmTarget = "21"
+    }
+
+    jar {
+        enabled = false
+    }
+
+    test {
+        useJUnitPlatform()
+    }
+
+    processResources {
+        dependsOn(generateVersionFile)
+        from(generateVersionFile) {
+            into(".")
+        }
+    }
 }
