@@ -21,7 +21,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
-          ref: master
+          ref: main
           token: ${{ secrets.SMARTEON_GIT_TOKEN }}
 
       - name: Setup JDK 21
