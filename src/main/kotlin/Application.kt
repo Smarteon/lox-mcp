@@ -65,7 +65,7 @@ fun Application.module() {
 
 private fun initAdapter(): LoxoneAdapter {
     return LoxoneAdapter(
-        host = System.getenv("LOXONE_HOST") ?: run {
+        address = System.getenv("LOXONE_HOST") ?: run {
             logger.error { "LOXONE_HOST environment variable is required" }
             exitProcess(1)
         },
