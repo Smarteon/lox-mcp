@@ -1,5 +1,7 @@
 package cz.smarteon.loxmcp
 
+import cz.smarteon.loxmcp.credentials.CredentialResolver
+import cz.smarteon.loxmcp.credentials.LoxoneCredentials
 import cz.smarteon.loxmcp.server.createMcpServer
 import cz.smarteon.loxmcp.server.createStdioMcpServer
 import io.github.oshai.kotlinlogging.KotlinLogging
@@ -15,39 +17,74 @@ import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
 
-fun main(args: Array<String>) {
-    val command = args.firstOrNull() ?: "--sse"
-    val port = args.getOrNull(1)?.toIntOrNull() ?: 3001
-    when (command) {
-        "--stdio" -> runStdioMode()
-        "--sse", "--http" -> runHttpMode(port)
-        else -> {
-            logger.error { "Invalid mode: $command. Use '--stdio' or '--http'" }
+/**
+ * Parsed command-line arguments.
+ */
+private data class AppArgs(
+    val mode: String = "--sse",
+    val port: Int = DEFAULT_PORT,
+    val originalArgs: Array<String> = emptyArray()
+) {
+    companion object {
+        const val DEFAULT_PORT = 3001
+
+        fun parse(args: Array<String>): AppArgs {
+            var mode = "--sse"
+            var port = DEFAULT_PORT
+
+            var i = 0
+            while (i < args.size) {
+                when (args[i]) {
+                    "--stdio" -> mode = "--stdio"
+                    "--sse", "--http" -> {
+                        mode = "--sse"
+                        args.getOrNull(i + 1)?.toIntOrNull()?.let {
+                            port = it
+                            i++
+                        }
+                    }
+                }
+                i++
+            }
+
+            return AppArgs(mode, port, args)
         }
     }
 }
 
-private fun runStdioMode() = runBlocking {
+fun main(args: Array<String>) {
+    val appArgs = AppArgs.parse(args)
+
+    when (appArgs.mode) {
+        "--stdio" -> runStdioMode(appArgs.originalArgs)
+        "--sse", "--http" -> runHttpMode(appArgs.port, appArgs.originalArgs)
+        else -> {
+            logger.error { "Invalid mode: ${appArgs.mode}. Use '--stdio' or '--http'" }
+        }
+    }
+}
+
+private fun runStdioMode(args: Array<String>) = runBlocking {
     logger.info { "Starting Loxone MCP Server in STDIO mode" }
 
-    val adapter = initAdapter()
+    val adapter = initAdapter(args)
     registerShutdownHook(adapter)
 
     createStdioMcpServer(adapter)
 }
 
-private fun runHttpMode(port: Int) {
+private fun runHttpMode(port: Int, args: Array<String>) {
     logger.info { "Starting Loxone MCP Server in HTTP/SSE mode" }
 
     embeddedServer(
         factory = Netty,
         port = port,
         host = "0.0.0.0",
-        module = Application::module
+        module = { module(args) }
     ).start(wait = true)
 }
 
-fun Application.module() {
+fun Application.module(args: Array<String> = emptyArray()) {
     install(ContentNegotiation) {
         json(Json {
             prettyPrint = true
@@ -55,7 +92,7 @@ fun Application.module() {
         })
     }
 
-    val adapter = initAdapter()
+    val adapter = initAdapter(args)
     registerShutdownHook(adapter)
 
     createMcpServer(adapter)
@@ -63,20 +100,20 @@ fun Application.module() {
     logger.info { "Loxone MCP Server started successfully" }
 }
 
-private fun initAdapter(): LoxoneAdapter {
+private fun initAdapter(args: Array<String>): LoxoneAdapter {
+    val source = CredentialResolver.fromArgs(args)
+
+    val credentials: LoxoneCredentials = try {
+        source.get()
+    } catch (e: Exception) {
+        logger.error { e.message }
+        exitProcess(1)
+    }
+
     return LoxoneAdapter(
-        address = System.getenv("LOXONE_HOST") ?: run {
-            logger.error { "LOXONE_HOST environment variable is required" }
-            exitProcess(1)
-        },
-        username = System.getenv("LOXONE_USER") ?: run {
-            logger.error { "LOXONE_USER environment variable is required" }
-            exitProcess(1)
-        },
-        password = System.getenv("LOXONE_PASS") ?: run {
-            logger.error { "LOXONE_PASS environment variable is required" }
-            exitProcess(1)
-        }
+        address = credentials.address,
+        username = credentials.username,
+        password = credentials.password
     )
 }
 
