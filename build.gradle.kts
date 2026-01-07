@@ -40,6 +40,7 @@ dependencies {
 
     implementation(libs.kotlin.logging)
     implementation(libs.slf4j.simple)
+    implementation(libs.pdfbox)
 
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.assertions.core)

@@ -42,5 +42,7 @@ object Constants {
         const val DEVICES_BY_CATEGORY = "devices_by_category"
         const val CATEGORIES_LIST = "categories_list"
         const val STRUCTURE_SUMMARY = "structure_summary"
+        const val STRUCTURE_FILE_LIST = "structure_file_list"
+        const val STRUCTURE_FILE_OBJECT = "structure_file_object"
     }
 }
