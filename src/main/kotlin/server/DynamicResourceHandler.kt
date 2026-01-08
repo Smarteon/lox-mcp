@@ -12,6 +12,7 @@ import cz.smarteon.loxmcp.server.LoxoneQueryHelper.findRoomByName
 import cz.smarteon.loxmcp.server.LoxoneQueryHelper.getVisibleControlsByType
 import cz.smarteon.loxmcp.server.LoxoneQueryHelper.getVisibleControlsForCategory
 import cz.smarteon.loxmcp.server.LoxoneQueryHelper.getVisibleControlsForRoom
+import cz.smarteon.loxmcp.loxonedocs.LoxoneDocsProvider
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.modelcontextprotocol.kotlin.sdk.ReadResourceResult
 import io.modelcontextprotocol.kotlin.sdk.TextResourceContents
@@ -44,6 +45,8 @@ class DynamicResourceHandler(
                 HandlerTypes.DEVICES_BY_CATEGORY -> handleDevicesByCategory(uri)
                 HandlerTypes.CATEGORIES_LIST -> handleCategoriesList()
                 HandlerTypes.STRUCTURE_SUMMARY -> handleStructureSummary()
+                HandlerTypes.STRUCTURE_FILE_LIST -> LoxoneDocsProvider.handleControlsList(uri)
+                HandlerTypes.STRUCTURE_FILE_OBJECT -> LoxoneDocsProvider.handleControlDetails(uri)
                 else -> errorResult(uri, "Unknown handler type: ${resourceConfig.handler.type}")
             }
         } catch (e: Exception) {

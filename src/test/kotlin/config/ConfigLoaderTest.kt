@@ -16,7 +16,7 @@ class ConfigLoaderTest : ShouldSpec({
 
             config shouldNotBe null
             config.tools shouldHaveSize 5
-            config.resources shouldHaveSize 7
+            config.resources shouldHaveSize 9
         }
 
         should("return default empty config when resource not found") {

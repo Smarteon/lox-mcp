@@ -25,7 +25,7 @@ repositories {
 }
 
 dependencies {
-    implementation("cz.smarteon.loxone:loxone-client-kotlin-jvm:0.6.0")
+    implementation("cz.smarteon.loxone:loxone-client-kotlin-jvm:0.6.1")
     implementation("io.modelcontextprotocol:kotlin-sdk:0.7.2")
 
     implementation(libs.ktor.server.core)
@@ -40,6 +40,7 @@ dependencies {
 
     implementation(libs.kotlin.logging)
     implementation(libs.slf4j.simple)
+    implementation(libs.pdfbox)
 
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.assertions.core)
