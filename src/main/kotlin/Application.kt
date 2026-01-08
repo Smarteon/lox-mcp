@@ -23,6 +23,7 @@ private val logger = KotlinLogging.logger {}
 private data class AppArgs(
     val mode: String = "--sse",
     val port: Int = DEFAULT_PORT,
+    val resourcesAsTools: Boolean = false,
     val originalArgs: Array<String> = emptyArray()
 ) {
     companion object {
@@ -31,6 +32,7 @@ private data class AppArgs(
         fun parse(args: Array<String>): AppArgs {
             var mode = "--sse"
             var port = DEFAULT_PORT
+            var resourcesAsTools = false
 
             var i = 0
             while (i < args.size) {
@@ -43,11 +45,12 @@ private data class AppArgs(
                             i++
                         }
                     }
+                    "--resources-as-tools" -> resourcesAsTools = true
                 }
                 i++
             }
 
-            return AppArgs(mode, port, args)
+            return AppArgs(mode, port, resourcesAsTools, args)
         }
     }
 }
@@ -56,35 +59,35 @@ fun main(args: Array<String>) {
     val appArgs = AppArgs.parse(args)
 
     when (appArgs.mode) {
-        "--stdio" -> runStdioMode(appArgs.originalArgs)
-        "--sse", "--http" -> runHttpMode(appArgs.port, appArgs.originalArgs)
+        "--stdio" -> runStdioMode(appArgs.originalArgs, appArgs.resourcesAsTools)
+        "--sse", "--http" -> runHttpMode(appArgs.port, appArgs.originalArgs, appArgs.resourcesAsTools)
         else -> {
             logger.error { "Invalid mode: ${appArgs.mode}. Use '--stdio' or '--http'" }
         }
     }
 }
 
-private fun runStdioMode(args: Array<String>) = runBlocking {
+private fun runStdioMode(args: Array<String>, resourcesAsTools: Boolean) = runBlocking {
     logger.info { "Starting Loxone MCP Server in STDIO mode" }
 
     val adapter = initAdapter(args)
     registerShutdownHook(adapter)
 
-    createStdioMcpServer(adapter)
+    createStdioMcpServer(adapter, resourcesAsTools)
 }
 
-private fun runHttpMode(port: Int, args: Array<String>) {
+private fun runHttpMode(port: Int, args: Array<String>, resourcesAsTools: Boolean) {
     logger.info { "Starting Loxone MCP Server in HTTP/SSE mode" }
 
     embeddedServer(
         factory = Netty,
         port = port,
         host = "0.0.0.0",
-        module = { module(args) }
+        module = { module(args, resourcesAsTools) }
     ).start(wait = true)
 }
 
-fun Application.module(args: Array<String> = emptyArray()) {
+fun Application.module(args: Array<String> = emptyArray(), resourcesAsTools: Boolean = false) {
     install(ContentNegotiation) {
         json(Json {
             prettyPrint = true
@@ -95,7 +98,7 @@ fun Application.module(args: Array<String> = emptyArray()) {
     val adapter = initAdapter(args)
     registerShutdownHook(adapter)
 
-    createMcpServer(adapter)
+    createMcpServer(adapter, resourcesAsTools)
 
     logger.info { "Loxone MCP Server started successfully" }
 }

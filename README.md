@@ -71,6 +71,20 @@ $env:LOXONE_PASS="your_password"
 ./gradlew run --args="--sse 3001"
 ```
 
+### 4. Resources as Tools Mode (Recommended)
+
+Many MCP clients have limited or no support for MCP resources. Use the `--resources-as-tools` flag to expose all resources as callable tools instead:
+
+```bash
+# STDIO mode with resources as tools
+./gradlew run --args="--stdio --resources-as-tools"
+
+# HTTP/SSE mode with resources as tools  
+./gradlew run --args="--sse 3001 --resources-as-tools"
+```
+
+This converts resources like `loxone://rooms` into tools like `get_rooms_list`, making them accessible to any MCP client.
+
 ## 🔌 Integration with AI Assistants
 
 ### Claude Desktop
@@ -85,7 +99,8 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
       "args": [
         "-jar",
         "/path/to/lox-mcp/build/libs/lox-mcp-*.jar",
-        "--stdio"
+        "--stdio",
+        "--resources-as-tools"
       ],
       "env": {
         "LOXONE_HOST": "http://192.168.1.77",
@@ -96,6 +111,8 @@ Add to your Claude Desktop configuration (`claude_desktop_config.json`):
   }
 }
 ```
+
+> **Note:** The `--resources-as-tools` flag is recommended because Claude Desktop has limited support for MCP resources.
 
 ### GitHub Copilot Chat (VS Code/JetBrains)
 

@@ -21,8 +21,12 @@ private val logger = KotlinLogging.logger {}
 /**
  * Creates and runs the MCP server with STDIO transport.
  * This mode is used by MCP clients like Claude Desktop that communicate via standard input/output.
+ *
+ * @param adapter The Loxone adapter for communication with Miniserver
+ * @param resourcesAsTools If true, resources will be registered as tools instead of MCP resources.
+ *                         This is useful for MCP clients that don't support resources well.
  */
-suspend fun createStdioMcpServer(adapter: LoxoneAdapter) {
+suspend fun createStdioMcpServer(adapter: LoxoneAdapter, resourcesAsTools: Boolean = false) {
     val server = Server(
         serverInfo = Implementation(
             name = Constants.SERVER_NAME,
@@ -30,7 +34,7 @@ suspend fun createStdioMcpServer(adapter: LoxoneAdapter) {
         ),
         options = ServerOptions(
             capabilities = ServerCapabilities(
-                resources = ServerCapabilities.Resources(
+                resources = if (resourcesAsTools) null else ServerCapabilities.Resources(
                     subscribe = false,
                     listChanged = false
                 ),
@@ -42,7 +46,12 @@ suspend fun createStdioMcpServer(adapter: LoxoneAdapter) {
     )
 
     registerTools(server, adapter)
-    registerResources(server, adapter)
+    if (resourcesAsTools) {
+        logger.info { "Registering resources as tools (--resources-as-tools mode)" }
+        registerResourcesAsTools(server, adapter)
+    } else {
+        registerResources(server, adapter)
+    }
 
     val transport = StdioServerTransport(
         inputStream = System.`in`.asSource().buffered(),
@@ -61,8 +70,12 @@ suspend fun createStdioMcpServer(adapter: LoxoneAdapter) {
 
 /**
  * Creates and configures the MCP server with SSE transport for HTTP mode.
+ *
+ * @param adapter The Loxone adapter for communication with Miniserver
+ * @param resourcesAsTools If true, resources will be registered as tools instead of MCP resources.
+ *                         This is useful for MCP clients that don't support resources well.
  */
-fun Application.createMcpServer(adapter: LoxoneAdapter) {
+fun Application.createMcpServer(adapter: LoxoneAdapter, resourcesAsTools: Boolean = false) {
     mcp {
         val server = Server(
             serverInfo = Implementation(
@@ -71,7 +84,7 @@ fun Application.createMcpServer(adapter: LoxoneAdapter) {
             ),
             options = ServerOptions(
                 capabilities = ServerCapabilities(
-                    resources = ServerCapabilities.Resources(
+                    resources = if (resourcesAsTools) null else ServerCapabilities.Resources(
                         subscribe = false,
                         listChanged = false
                     ),
@@ -82,7 +95,12 @@ fun Application.createMcpServer(adapter: LoxoneAdapter) {
             )
         )
         registerTools(server, adapter)
-        registerResources(server, adapter)
+        if (resourcesAsTools) {
+            logger.info { "Registering resources as tools (--resources-as-tools mode)" }
+            registerResourcesAsTools(server, adapter)
+        } else {
+            registerResources(server, adapter)
+        }
 
         server
     }
