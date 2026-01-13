@@ -13,7 +13,6 @@ import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.put
-import kotlinx.serialization.json.putJsonArray
 
 private val logger = KotlinLogging.logger {}
 
@@ -53,15 +52,20 @@ private fun registerResourceAsTool(server: Server, adapter: LoxoneAdapter, resou
 
     val handler = DynamicResourceHandler(adapter, resourceConfig)
 
-    // Build input schema based on URI parameters
-    val inputSchema = buildInputSchema(uriParams, resourceConfig)
+    // Build inputSchema - use ToolSchema() for no params, or with properties/required for params
+    val inputSchema = if (uriParams.isEmpty()) {
+        ToolSchema()
+    } else {
+        val (properties, required) = buildToolSchemaParams(uriParams, resourceConfig)
+        ToolSchema(properties = properties, required = required)
+    }
 
     logger.info { "Registering resource as tool: '$toolName' with params: $uriParams" }
 
     server.addTool(
         name = toolName,
         description = buildToolDescription(resourceConfig),
-        inputSchema = Tool.Input(inputSchema)
+        inputSchema = inputSchema
     ) { request ->
         try {
             // Build the URI from parameters
@@ -105,11 +109,14 @@ private fun extractUriParameters(uri: String): List<String> {
 }
 
 /**
- * Build JSON schema for tool input based on URI parameters.
+ * Build properties and required list for ToolSchema based on URI parameters.
+ * ToolSchema automatically wraps with type: "object".
  */
-private fun buildInputSchema(uriParams: List<String>, resourceConfig: ResourceConfig) = buildJsonObject {
-    put("type", "object")
-    put("properties", buildJsonObject {
+private fun buildToolSchemaParams(
+    uriParams: List<String>,
+    resourceConfig: ResourceConfig
+): Pair<JsonObject, List<String>> {
+    val properties = buildJsonObject {
         uriParams.forEach { param ->
             val snakeCaseParam = camelToSnakeCase(param)
             put(snakeCaseParam, buildJsonObject {
@@ -117,14 +124,9 @@ private fun buildInputSchema(uriParams: List<String>, resourceConfig: ResourceCo
                 put("description", getParameterDescription(param, resourceConfig))
             })
         }
-    })
-    if (uriParams.isNotEmpty()) {
-        putJsonArray("required") {
-            uriParams.forEach { param ->
-                add(JsonPrimitive(camelToSnakeCase(param)))
-            }
-        }
     }
+    val required = uriParams.map { camelToSnakeCase(it) }
+    return Pair(properties, required)
 }
 
 /**
@@ -144,12 +146,12 @@ private fun buildToolDescription(resourceConfig: ResourceConfig): String {
 private fun buildUriFromParams(
     uriTemplate: String,
     uriParams: List<String>,
-    arguments: Map<String, kotlinx.serialization.json.JsonElement>
+    arguments: JsonObject?
 ): String {
     var uri = uriTemplate
     uriParams.forEach { param ->
         val snakeCaseParam = camelToSnakeCase(param)
-        val value = arguments[snakeCaseParam]?.jsonPrimitive?.content
+        val value = arguments?.get(snakeCaseParam)?.jsonPrimitive?.content
             ?: throw IllegalArgumentException("Missing required parameter: $snakeCaseParam")
         uri = uri.replace("{$param}", value)
     }
