@@ -59,9 +59,17 @@ class LoxoneAdapter(
             }
             AddressType.MAC -> {
                 val normalizedMac = address.replace(COLON, "")
-                LoxoneEndpoint.fromUrl(LOX_DNS_URL + normalizedMac)
+                val url = "$LOX_DNS_URL$normalizedMac"
+                LoxoneEndpoint.fromUrl(url)
             }
-            AddressType.URL -> LoxoneEndpoint.fromUrl(address)
+            AddressType.URL -> {
+                val urlWithProtocol = if (address.startsWith(HTTP_PREFIX) || address.startsWith(HTTPS_PREFIX)) {
+                    address
+                } else {
+                    "$HTTPS_PREFIX$address"
+                }
+                LoxoneEndpoint.fromUrl(urlWithProtocol)
+            }
         }
     }
 
@@ -141,6 +149,8 @@ class LoxoneAdapter(
     }
 
     companion object {
+        private const val HTTP_PREFIX = "http://"
+        private const val HTTPS_PREFIX = "https://"
         private const val COLON = ":"
         private val IP_REGEX = Regex("^((25[0-5]|(2[0-4]|1\\d|[1-9]|)\\d)\\.?\\b){4}(:[0-9]{1,5})?")
         private val MAC_REGEX = Regex("504F[0-9A-Fa-f]{8}")
