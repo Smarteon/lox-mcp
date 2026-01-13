@@ -4,14 +4,13 @@ import cz.smarteon.loxmcp.Constants
 import cz.smarteon.loxmcp.LoxoneAdapter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.Application
-import io.modelcontextprotocol.kotlin.sdk.Implementation
-import io.modelcontextprotocol.kotlin.sdk.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport
 import io.modelcontextprotocol.kotlin.sdk.server.mcp
-import kotlinx.coroutines.CancellationException
-import kotlinx.coroutines.awaitCancellation
+import io.modelcontextprotocol.kotlin.sdk.types.Implementation
+import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
+import kotlinx.coroutines.CompletableDeferred
 import kotlinx.io.asSink
 import kotlinx.io.asSource
 import kotlinx.io.buffered
@@ -57,15 +56,19 @@ suspend fun createStdioMcpServer(adapter: LoxoneAdapter, resourcesAsTools: Boole
         inputStream = System.`in`.asSource().buffered(),
         outputStream = System.out.asSink().buffered()
     )
-    server.connect(transport)
 
-    try {
-        logger.info { "Loxone MCP Server started in STDIO mode" }
-        awaitCancellation()
-    } catch (e: CancellationException) {
-        logger.info { "STDIO server cancelled, shutting down" }
-        throw e
+    val sessionClosed = CompletableDeferred<Unit>()
+
+    val session = server.createSession(transport)
+
+    session.onClose {
+        logger.debug { "STDIO MCP session closed" }
+        sessionClosed.complete(Unit)
     }
+
+    sessionClosed.await()
+
+    logger.info { "STDIO server shutting down" }
 }
 
 /**

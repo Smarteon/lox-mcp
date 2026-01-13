@@ -9,8 +9,8 @@ import cz.smarteon.loxmcp.server.LoxoneQueryHelper.getVisibleControlsByType
 import cz.smarteon.loxmcp.server.LoxoneQueryHelper.getVisibleControlsForCategory
 import cz.smarteon.loxmcp.server.LoxoneQueryHelper.getVisibleControlsForRoom
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.modelcontextprotocol.kotlin.sdk.CallToolResult
-import io.modelcontextprotocol.kotlin.sdk.TextContent
+import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextContent
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive

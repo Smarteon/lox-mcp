@@ -1,8 +1,8 @@
 package cz.smarteon.loxmcp.loxonedocs
 
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.modelcontextprotocol.kotlin.sdk.ReadResourceResult
-import io.modelcontextprotocol.kotlin.sdk.TextResourceContents
+import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
+import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
 import kotlinx.serialization.builtins.ListSerializer
 import kotlinx.serialization.json.Json
 

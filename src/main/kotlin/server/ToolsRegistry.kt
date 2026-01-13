@@ -4,8 +4,8 @@ import cz.smarteon.loxmcp.LoxoneAdapter
 import cz.smarteon.loxmcp.config.ConfigLoader
 import cz.smarteon.loxmcp.config.ToolConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.modelcontextprotocol.kotlin.sdk.Tool
 import io.modelcontextprotocol.kotlin.sdk.server.Server
+import io.modelcontextprotocol.kotlin.sdk.types.ToolSchema
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
@@ -36,41 +36,39 @@ fun registerTools(server: Server, adapter: LoxoneAdapter) {
 private fun registerTool(server: Server, adapter: LoxoneAdapter, toolConfig: ToolConfig) {
     val handler = DynamicToolHandler(adapter, toolConfig)
 
-    val properties = buildJsonObject {
-        toolConfig.parameters.forEach { param ->
-            put(param.name, buildJsonObject {
-                put("type", param.type)
-                put("description", param.description)
-                param.enum?.let { enumValues ->
-                    putJsonArray("enum") {
-                        enumValues.forEach { add(JsonPrimitive(it)) }
+    // Build inputSchema based on whether tool has parameters
+    val inputSchema = if (toolConfig.parameters.isEmpty()) {
+        ToolSchema()
+    } else {
+        val properties = buildJsonObject {
+            toolConfig.parameters.forEach { param ->
+                put(param.name, buildJsonObject {
+                    put("type", param.type)
+                    put("description", param.description)
+                    param.enum?.let { enumValues ->
+                        putJsonArray("enum") {
+                            enumValues.forEach { add(JsonPrimitive(it)) }
+                        }
                     }
-                }
-                param.default?.let { put("default", JsonPrimitive(it)) }
-            })
-        }
-    }
-
-    val required = toolConfig.parameters.filter { it.required }.map { it.name }
-
-    val inputSchema = buildJsonObject {
-        put("type", "object")
-        put("properties", properties)
-        if (required.isNotEmpty()) {
-            putJsonArray("required") {
-                required.forEach { add(JsonPrimitive(it)) }
+                    param.default?.let { defaultValue ->
+                        put("default", JsonPrimitive(defaultValue))
+                    }
+                })
             }
         }
+        val required = toolConfig.parameters.filter { it.required }.map { it.name }
+        ToolSchema(properties = properties, required = required)
     }
 
-    logger.info { "Registering tool '${toolConfig.name}' with schema: $inputSchema" }
+    logger.info { "Registering tool '${toolConfig.name}'" }
 
     server.addTool(
         name = toolConfig.name,
         description = toolConfig.description,
-        inputSchema = Tool.Input(inputSchema)
+        inputSchema = inputSchema
     ) { request ->
-        handler.handle(request.arguments)
+        handler.handle(request.arguments
+            ?: throw IllegalArgumentException("Missing required arguments for tool '${toolConfig.name}'"))
     }
 
     logger.debug { "Registered tool: ${toolConfig.name}" }
