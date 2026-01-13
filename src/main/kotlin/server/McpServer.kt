@@ -4,8 +4,6 @@ import cz.smarteon.loxmcp.Constants
 import cz.smarteon.loxmcp.LoxoneAdapter
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.Application
-import io.modelcontextprotocol.kotlin.sdk.Implementation
-import io.modelcontextprotocol.kotlin.sdk.ServerCapabilities
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import io.modelcontextprotocol.kotlin.sdk.server.ServerOptions
 import io.modelcontextprotocol.kotlin.sdk.server.StdioServerTransport

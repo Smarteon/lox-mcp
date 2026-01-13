@@ -4,7 +4,6 @@ import cz.smarteon.loxmcp.LoxoneAdapter
 import cz.smarteon.loxmcp.config.ConfigLoader
 import cz.smarteon.loxmcp.config.ToolConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
-import io.modelcontextprotocol.kotlin.sdk.Tool
 import io.modelcontextprotocol.kotlin.sdk.server.Server
 import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
