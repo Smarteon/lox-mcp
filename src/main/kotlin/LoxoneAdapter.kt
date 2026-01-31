@@ -6,7 +6,19 @@ import cz.smarteon.loxkt.LoxoneCommands
 import cz.smarteon.loxkt.LoxoneEndpoint
 import cz.smarteon.loxkt.app.LoxoneApp
 import cz.smarteon.loxkt.ktor.KtorHttpLoxoneClient
+import cz.smarteon.loxkt.LoxoneCredentials
+import cz.smarteon.loxkt.LoxoneProfile
+import cz.smarteon.loxkt.state.LoxoneState
+import cz.smarteon.loxkt.LoxoneTokenAuthenticator
+import cz.smarteon.loxkt.app.Control
+import cz.smarteon.loxkt.callForMsg
+import cz.smarteon.loxkt.ktor.KtorWebsocketLoxoneClient
+import cz.smarteon.loxkt.state.collectFrom
+import cz.smarteon.loxkt.app.getAllValues
 import io.github.oshai.kotlinlogging.KotlinLogging
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 private val logger = KotlinLogging.logger {}
 
@@ -18,14 +30,20 @@ private val logger = KotlinLogging.logger {}
  * - Local IP: `192.168.1.100` or `192.168.1.100:8080`
  * - MAC address: `504F12345678` (resolved via Loxone Cloud DNS)
  * - URL: `https://dns.loxonecloud.com/504F12345678`
+ *
+ * @param scope CoroutineScope for managing WebSocket state updates lifecycle
  */
 class LoxoneAdapter(
     private val address: String,
     private val username: String,
-    private val password: String
+    private val password: String,
+    private val scope: CoroutineScope
 ) {
     private var client: LoxoneClient? = null
     private var cachedApp: LoxoneApp? = null
+
+    private val state = LoxoneState()
+    private var wsClient: KtorWebsocketLoxoneClient? = null
 
     /**
      * Lazily initializes and returns the HTTP client.
@@ -143,9 +161,48 @@ class LoxoneAdapter(
     }
 
     /**
-     * Close the client connection.
+     * Initialize WebSocket event streaming for state value updates.
+     * Call this once at startup to enable state reading functionality.
+     */
+    suspend fun enableStateUpdates() {
+        logger.info { "Enabling state updates" }
+
+        val endpoint = resolveEndpoint(address)
+        val profile = LoxoneProfile(endpoint, LoxoneCredentials(username, password))
+        val auth = LoxoneTokenAuthenticator(profile)
+
+        wsClient = KtorWebsocketLoxoneClient(endpoint, auth).also {
+            scope.launch {
+                state.collectFrom(it.events)
+            }
+            it.callForMsg(LoxoneCommands.App.enableBinStatusUpdate())
+        }
+        logger.info { "State updates enabled" }
+    }
+
+    /**
+     * Get the underlying LoxoneState for direct access to all state values.
+     * Use this for bulk state queries.
+     */
+    fun getState(): LoxoneState = state
+
+    /**
+     * Get all current state values for a control by its UUID.
+     * Looks up the control's states in the structure file and returns their current values.
+     *
+     * @param control The control to get states for
+     * @return Map of state name -> typed state value (ValueState or TextState)
+     */
+    suspend fun getControlStates(control: Control): Map<String, Any> {
+        return control.getAllValues(state)
+    }
+
+    /**
+     * Close the client connections.
      */
     suspend fun close() {
+        wsClient?.close()
+        wsClient = null
         client?.close()
         client = null
         cachedApp = null

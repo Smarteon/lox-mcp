@@ -12,6 +12,11 @@ import io.ktor.server.application.install
 import io.ktor.server.engine.embeddedServer
 import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
 import kotlin.system.exitProcess
@@ -92,8 +97,16 @@ fun main(args: Array<String>) {
 private fun runStdioMode(args: Array<String>) = runBlocking {
     logger.info { "Starting Loxone MCP Server in STDIO mode" }
 
-    val adapter = initAdapter(args)
-    registerShutdownHook(adapter)
+    val scope = CoroutineScope(Dispatchers.Default + SupervisorJob())
+    val adapter = initAdapter(args, scope)
+
+    runCatching {
+        adapter.enableStateUpdates()
+    }.onFailure { e ->
+        logger.error(e) { "Failed to enable state updates during startup" }
+    }
+
+    registerShutdownHook(adapter, scope)
 
     createStdioMcpServer(adapter)
 }
@@ -117,15 +130,24 @@ fun Application.module(args: Array<String> = emptyArray()) {
         })
     }
 
-    val adapter = initAdapter(args)
-    registerShutdownHook(adapter)
+    val adapterScope = CoroutineScope(coroutineContext + SupervisorJob())
+    val adapter = initAdapter(args, adapterScope)
 
+    launch {
+        runCatching {
+            adapter.enableStateUpdates()
+        }.onFailure { e ->
+            logger.error(e) { "Failed to enable state updates" }
+        }
+    }
+
+    registerShutdownHook(adapter, adapterScope)
     createMcpServer(adapter)
 
     logger.info { "Loxone MCP Server started successfully" }
 }
 
-private fun initAdapter(args: Array<String>): LoxoneAdapter {
+private fun initAdapter(args: Array<String>, scope: CoroutineScope): LoxoneAdapter {
     val source = CredentialResolver.fromArgs(args)
 
     val credentials: LoxoneCredentials = try {
@@ -138,20 +160,22 @@ private fun initAdapter(args: Array<String>): LoxoneAdapter {
     return LoxoneAdapter(
         address = credentials.address,
         username = credentials.username,
-        password = credentials.password
+        password = credentials.password,
+        scope = scope
     )
 }
 
 /**
- * Registers a shutdown hook to gracefully close the Loxone adapter connection.
+ * Registers a shutdown hook to gracefully close the Loxone adapter connection and cancel the scope.
  */
-private fun registerShutdownHook(adapter: LoxoneAdapter) {
+private fun registerShutdownHook(adapter: LoxoneAdapter, scope: CoroutineScope) {
     Runtime.getRuntime().addShutdownHook(Thread {
         runBlocking {
-            try {
+            runCatching {
                 adapter.close()
+                scope.cancel()
                 logger.info { "Loxone connection closed successfully" }
-            } catch (e: Exception) {
+            }.onFailure { e ->
                 logger.error(e) { "Error during shutdown" }
             }
         }
