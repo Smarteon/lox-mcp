@@ -1,6 +1,10 @@
 package cz.smarteon.loxmcp.server
 
+import cz.smarteon.loxkt.app.Control
+import cz.smarteon.loxkt.app.LoxoneApp
 import cz.smarteon.loxkt.app.getVisibleControls
+import cz.smarteon.loxkt.state.TextState
+import cz.smarteon.loxkt.state.ValueState
 import cz.smarteon.loxmcp.Constants.HandlerTypes
 import cz.smarteon.loxmcp.LoxoneAdapter
 import cz.smarteon.loxmcp.config.ResourceConfig
@@ -19,9 +23,13 @@ import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.JsonObjectBuilder
+import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
+import java.net.URLDecoder.decode
 
 private val logger = KotlinLogging.logger {}
 
@@ -47,6 +55,8 @@ class DynamicResourceHandler(
                 HandlerTypes.STRUCTURE_SUMMARY -> handleStructureSummary()
                 HandlerTypes.STRUCTURE_FILE_LIST -> LoxoneDocsProvider.handleControlsList(uri)
                 HandlerTypes.STRUCTURE_FILE_OBJECT -> LoxoneDocsProvider.handleControlDetails(uri)
+                HandlerTypes.ALL_DEVICE_STATES -> handleAllDeviceStates(uri)
+                HandlerTypes.DEVICE_STATE -> handleDeviceState(uri)
                 else -> errorResult(uri, "Unknown handler type: ${resourceConfig.handler.type}")
             }
         } catch (e: Exception) {
@@ -169,6 +179,126 @@ class DynamicResourceHandler(
 
         val content = json.encodeToString(JsonObject.serializer(), summary)
         return successResult(resourceConfig.uri, content, "application/json")
+    }
+
+    private suspend fun handleAllDeviceStates(uri: String): ReadResourceResult {
+        val app = adapter.getApp()
+        val queryParams = parseQueryParams(uri.substringAfter("?", ""))
+
+        val filteredControls = applyDeviceFilters(app, queryParams)
+        if (filteredControls.isFailure) {
+            return errorResult(uri, filteredControls.errorMessage)
+        }
+
+        val deviceJsons = filteredControls.controls.map { control ->
+            buildDeviceStateJson(control, app.rooms[control.room]?.name)
+        }
+
+        val statesResult = buildJsonObject {
+            put("totalDevices", filteredControls.controls.size)
+            put("stateCount", adapter.getState().size())
+            if (queryParams.isNotEmpty()) {
+                putJsonObject("filters") { queryParams.forEach { (k, v) -> put(k, v) } }
+            }
+            putJsonArray("devices") { deviceJsons.forEach { add(it) } }
+        }
+
+        return successResult(uri, json.encodeToString(JsonObject.serializer(), statesResult), "application/json")
+    }
+
+    private data class FilterResult(
+        val controls: List<Control> = emptyList(),
+        val isFailure: Boolean = false,
+        val errorMessage: String = ""
+    )
+
+    private fun applyDeviceFilters(app: LoxoneApp, queryParams: Map<String, String>): FilterResult {
+        val roomUuid = queryParams["room"]?.let { name ->
+            app.findRoomByName(name)?.uuid
+                ?: return FilterResult(isFailure = true, errorMessage = "Room not found: $name")
+        }
+        val categoryUuid = queryParams["category"]?.let { name ->
+            app.findCategoryByName(name)?.uuid
+                ?: return FilterResult(isFailure = true, errorMessage = "Category not found: $name")
+        }
+
+        val controls = app.getVisibleControls()
+            .asSequence()
+            .filter { queryParams["filter"]?.let { f -> it.name.contains(f, ignoreCase = true) } ?: true }
+            .filter { roomUuid?.equals(it.room) ?: true }
+            .filter { queryParams["type"]?.let { t -> it.type.equals(t, ignoreCase = true) } ?: true }
+            .filter { categoryUuid?.equals(it.cat) ?: true }
+            .toList()
+
+        return FilterResult(controls)
+    }
+
+    private suspend fun buildDeviceStateJson(control: Control, roomName: String?) = buildJsonObject {
+        put("uuid", control.uuidAction)
+        put("name", control.name)
+        put("type", control.type)
+        roomName?.let { put("room", it) }
+
+        val states = adapter.getControlStates(control)
+        put("statesAvailable", states.isNotEmpty())
+        if (states.isNotEmpty()) {
+            putJsonObject("states") {
+                states.forEach { (name, value) -> putStateValue(name, value) }
+            }
+        }
+    }
+
+    private suspend fun handleDeviceState(uri: String): ReadResourceResult {
+        val deviceUuid = uri.substringAfter("devices/").substringBefore("/state")
+            .takeIf { it.isNotBlank() } ?: return errorResult(uri, "Device UUID not found in URI")
+
+        val app = adapter.getApp()
+        val control = app.controls[deviceUuid]
+            ?: return errorResult(uri, "Device not found with UUID: $deviceUuid")
+
+        val states = adapter.getControlStates(control)
+
+        val stateResult = buildJsonObject {
+            put("uuid", deviceUuid)
+            put("name", control.name)
+            put("type", control.type)
+            control.room?.let { put("room", app.rooms[it]?.name) }
+            control.cat?.let { put("category", app.cats[it]?.name) }
+            put("statesAvailable", states.isNotEmpty())
+
+            if (states.isEmpty()) {
+                put("message", "No state values available yet. State updates may not be enabled.")
+                control.states?.keys?.let { keys ->
+                    putJsonArray("expectedStates") { keys.forEach { add(JsonPrimitive(it)) } }
+                }
+            } else {
+                putJsonObject("states") { states.forEach { (name, value) -> putStateValue(name, value) } }
+            }
+        }
+
+        return successResult(uri, json.encodeToString(JsonObject.serializer(), stateResult), "application/json")
+    }
+
+    /**
+     * Parse query parameters from a query string.
+     */
+    private fun parseQueryParams(queryString: String): Map<String, String> =
+        queryString.takeIf { it.isNotBlank() }
+            ?.split("&")
+            ?.mapNotNull {
+                it.split("=", limit = 2).takeIf { p -> p.size == 2 && p[0].isNotBlank() }?.let { p ->
+                    decode(p[0], "UTF-8") to decode(p[1], "UTF-8")
+                }
+            }
+            ?.toMap()
+            ?: emptyMap()
+
+    private fun JsonObjectBuilder.putStateValue(name: String, value: Any) {
+        when (value) {
+            is ValueState -> put(name, value.value)
+            is TextState -> put(name, value.text)
+            else -> put(name, value.toString())
+        }
     }
 
     private fun successResult(uri: String, content: String, mimeType: String) = ReadResourceResult(

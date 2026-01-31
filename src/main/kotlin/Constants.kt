@@ -44,5 +44,7 @@ object Constants {
         const val STRUCTURE_SUMMARY = "structure_summary"
         const val STRUCTURE_FILE_LIST = "structure_file_list"
         const val STRUCTURE_FILE_OBJECT = "structure_file_object"
+        const val ALL_DEVICE_STATES = "all_device_states"
+        const val DEVICE_STATE = "device_state"
     }
 }

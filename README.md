@@ -8,7 +8,8 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that c
 
 ## ✨ Features
 
-- 🔌 **Reliable Connection** - Connects to Loxone Miniserver via HTTP API
+- 🔌 **Reliable Connection** - Connects to Loxone Miniserver via HTTP API and WebSocket
+- 📊 **Real-time State Reading** - Read device states via WebSocket event streaming
 - 🔐 **Flexible Credentials** - Multiple credential sources (env vars, CLI args, Bitwarden)
 - 📝 **Configuration-Driven** - Define tools and resources in YAML without code changes
 - 🎯 **Dynamic Registration** - Tools and resources automatically loaded from configuration
@@ -149,7 +150,33 @@ lox-mcp/
 └── README.md                       # This file
 ```
 
-## 🛠️ Configuration
+### Available Tools
+
+The server exposes these MCP tools for controlling Loxone devices:
+
+| Tool | Description |
+|------|-------------|
+| `control_device` | Control a specific device by UUID (on, off, toggle, up, down, stop) |
+| `control_devices_by_room` | Control all devices in a room (with optional type filter and state reading) |
+| `control_devices_by_type` | Control all devices of a specific type system-wide |
+| `control_devices_by_category` | Control all devices in a category |
+| `send_command` | Send raw commands for advanced control |
+
+### Available Resources
+
+Resources provide read-only access to Loxone system data:
+
+| Resource URI | Description |
+|--------------|-------------|
+| `loxone://structure/summary` | Overview of rooms, devices, and categories |
+| `loxone://rooms` | List of all rooms with device counts |
+| `loxone://rooms/{roomName}/devices` | Devices in a specific room |
+| `loxone://devices/all` | Complete list of all devices |
+| `loxone://devices/type/{type}` | Devices filtered by type (e.g., Switch, Dimmer) |
+| `loxone://devices/category/{name}` | Devices filtered by category |
+| `loxone://categories` | List of all categories |
+| `loxone://devices/states` | **Real-time state values for all devices** |
+| `loxone://devices/{uuid}/state` | **State values for a specific device** |
 
 ### Custom Configuration Files
 
