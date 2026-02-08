@@ -2,6 +2,7 @@ package cz.smarteon.loxmcp.server
 
 import cz.smarteon.loxmcp.Constants
 import cz.smarteon.loxmcp.LoxoneAdapter
+import cz.smarteon.loxmcp.config.McpServerProperties
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.Application
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -22,10 +23,8 @@ private val logger = KotlinLogging.logger {}
  * This mode is used by MCP clients like Claude Desktop that communicate via standard input/output.
  *
  * @param adapter The Loxone adapter for communication with Miniserver
- * @param resourcesAsTools If true, resources will be registered as tools instead of MCP resources.
- *                         This is useful for MCP clients that don't support resources well.
  */
-suspend fun createStdioMcpServer(adapter: LoxoneAdapter, resourcesAsTools: Boolean = false) {
+suspend fun createStdioMcpServer(adapter: LoxoneAdapter) {
     val server = Server(
         serverInfo = Implementation(
             name = Constants.SERVER_NAME,
@@ -33,7 +32,7 @@ suspend fun createStdioMcpServer(adapter: LoxoneAdapter, resourcesAsTools: Boole
         ),
         options = ServerOptions(
             capabilities = ServerCapabilities(
-                resources = if (resourcesAsTools) null else ServerCapabilities.Resources(
+                resources = if (McpServerProperties.resourcesAsTools) null else ServerCapabilities.Resources(
                     subscribe = false,
                     listChanged = false
                 ),
@@ -45,7 +44,7 @@ suspend fun createStdioMcpServer(adapter: LoxoneAdapter, resourcesAsTools: Boole
     )
 
     registerTools(server, adapter)
-    if (resourcesAsTools) {
+    if (McpServerProperties.resourcesAsTools) {
         logger.info { "Registering resources as tools (--resources-as-tools mode)" }
         registerResourcesAsTools(server, adapter)
     } else {
@@ -75,10 +74,8 @@ suspend fun createStdioMcpServer(adapter: LoxoneAdapter, resourcesAsTools: Boole
  * Creates and configures the MCP server with SSE transport for HTTP mode.
  *
  * @param adapter The Loxone adapter for communication with Miniserver
- * @param resourcesAsTools If true, resources will be registered as tools instead of MCP resources.
- *                         This is useful for MCP clients that don't support resources well.
  */
-fun Application.createMcpServer(adapter: LoxoneAdapter, resourcesAsTools: Boolean = false) {
+fun Application.createMcpServer(adapter: LoxoneAdapter) {
     mcp {
         val server = Server(
             serverInfo = Implementation(
@@ -87,7 +84,7 @@ fun Application.createMcpServer(adapter: LoxoneAdapter, resourcesAsTools: Boolea
             ),
             options = ServerOptions(
                 capabilities = ServerCapabilities(
-                    resources = if (resourcesAsTools) null else ServerCapabilities.Resources(
+                    resources = if (McpServerProperties.resourcesAsTools) null else ServerCapabilities.Resources(
                         subscribe = false,
                         listChanged = false
                     ),
@@ -98,7 +95,7 @@ fun Application.createMcpServer(adapter: LoxoneAdapter, resourcesAsTools: Boolea
             )
         )
         registerTools(server, adapter)
-        if (resourcesAsTools) {
+        if (McpServerProperties.resourcesAsTools) {
             logger.info { "Registering resources as tools (--resources-as-tools mode)" }
             registerResourcesAsTools(server, adapter)
         } else {
