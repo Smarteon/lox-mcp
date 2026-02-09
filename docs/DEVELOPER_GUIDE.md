@@ -56,6 +56,82 @@ private suspend fun handleMyHandlerType(arguments: JsonObject): CallToolResult {
 
 3. **Test**: Restart the server and the new tool will be available!
 
+### Using the Generic Command Handler
+
+The `generic_command` handler type allows you to create tools that send any Loxone command using a template.
+
+#### Basic Generic Command
+
+```yaml
+tools:
+  - name: my_custom_command
+    description: Send a custom command to a control
+    parameters:
+      - name: control
+        type: string
+        description: The UUID or name of the control
+        required: true
+      - name: action
+        type: string
+        description: The action to perform
+        required: true
+    handler:
+      type: generic_command
+      commandTemplate: "/jdev/sps/io/{control}/{action}"
+```
+
+The `{control}` and `{action}` placeholders are automatically replaced with parameter values.
+
+#### Complex Commands with Multiple Parameters
+
+For complex Loxone commands like Daytimer entries:
+
+```yaml
+tools:
+  - name: set_daytimer_entries
+    description: |
+      Set entries for a Daytimer control.
+      Entry format: mode;fromMinutes;toMinutes;needsActivation;value
+    parameters:
+      - name: control
+        type: string
+        description: The UUID of the Daytimer
+        required: true
+      - name: entryCount
+        type: string
+        description: Number of entries
+        required: true
+      - name: entries
+        type: string
+        description: Entry definitions (e.g., "0;480;1080;0;0")
+        required: true
+    handler:
+      type: generic_command
+      commandTemplate: "/jdev/sps/io/{control}/set/{entryCount}/{entries}"
+```
+
+#### Handler Properties
+
+| Property | Type | Description |
+|----------|------|-------------|
+| `type` | string | Must be `generic_command` |
+| `commandTemplate` | string | URL template with `{paramName}` placeholders |
+
+#### Template Placeholders
+
+- Use `{parameterName}` in the template
+- Parameter names must match the `name` field in `parameters`
+- Required parameters without values will cause an error
+- Optional parameters use their `default` value if defined, or cause an error if missing
+
+#### Example Use Cases
+
+1. **Dimmer control**: `/jdev/sps/io/{control}/{value}`
+2. **Timer pulse**: `/jdev/sps/io/{control}/pulse`
+3. **Daytimer entries**: `/jdev/sps/io/{control}/set/{count}/{entries}`
+4. **Mood activation**: `/jdev/sps/io/{control}/changeTo/{moodId}`
+5. **Temperature setpoint**: `/jdev/sps/io/{control}/setTemp/{temperature}`
+
 ### Adding a New Resource
 
 1. **Define in YAML** (`src/main/resources/mcp-config.yaml`):

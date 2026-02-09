@@ -38,7 +38,8 @@ data class ToolHandler(
     val scope: String? = null,
     val target: String? = null,
     val action: String? = null,
-    val valueParam: String? = null
+    val valueParam: String? = null,
+    val commandTemplate: String? = null
 )
 
 /**
