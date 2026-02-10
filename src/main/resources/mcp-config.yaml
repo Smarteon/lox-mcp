@@ -82,22 +82,29 @@ tools:
     handler:
       type: control_devices_by_category
 
-  # Raw command for advanced control
-  - name: send_command
+  # Generic control command - allows building complex Loxone commands
+  - name: send_control_command
     description: |
-      Send a raw command to a device by UUID.
-      This is an advanced tool for commands not covered by other tools.
+      Send a command to a device by UUID.
+      This is a flexible tool that supports any Loxone command.
+      
+      Examples:
+      - Basic: control="uuid", action="On" or "Off"
+      - Dimmer: control="uuid", action="50" (brightness 0-100)
+      - Blinds: control="uuid", action="FullUp" or "FullDown"
+      - Complex: Any valid Loxone command path
     parameters:
-      - name: uuid
+      - name: control
         type: string
-        description: The UUID of the device
+        description: The UUID of the control to target
         required: true
-      - name: command
+      - name: action
         type: string
-        description: The raw command to send (e.g., "On", "Off", "50" for dimmer)
+        description: The action/command to send (e.g., "On", "Off", "50", "FullUp")
         required: true
     handler:
-      type: send_command
+      type: generic_command
+      commandTemplate: "/jdev/sps/io/{control}/{action}"
 
 resources:
   # Structure summary

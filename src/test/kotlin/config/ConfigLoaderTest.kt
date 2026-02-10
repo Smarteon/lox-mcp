@@ -90,7 +90,7 @@ class ConfigLoaderTest : ShouldSpec({
                   - name: custom_tool
                     description: Custom tool
                     handler:
-                      type: send_command
+                      type: generic_command
                 resources:
                   - uri: loxone://custom
                     name: Custom Resource
@@ -108,8 +108,10 @@ class ConfigLoaderTest : ShouldSpec({
                 config.tools shouldHaveSize 6  // 5 internal + 1 custom
                 config.resources shouldHaveSize 10  // 9 internal + 1 custom
 
+                // Verify custom tool is present
                 config.tools.any { it.name == "custom_tool" } shouldBe true
-                config.tools.any { it.name == "send_command" } shouldBe true
+                // Verify internal tools are still present
+                config.tools.any { it.name == "send_control_command" } shouldBe true
             } finally {
                 tempFile.delete()
             }
@@ -123,7 +125,7 @@ class ConfigLoaderTest : ShouldSpec({
                   - name: custom_tool_only
                     description: Only custom tool
                     handler:
-                      type: send_command
+                      type: send_control_command
                 resources:
                   - uri: loxone://custom_only
                     name: Only Custom Resource
@@ -153,8 +155,8 @@ class ConfigLoaderTest : ShouldSpec({
             tempFile.writeText(
                 """
                 tools:
-                  - name: send_command
-                    description: Overridden send command tool
+                  - name: send_control_command
+                    description: Overridden control command tool
                     handler:
                       type: custom_handler
                 resources: []
@@ -165,11 +167,11 @@ class ConfigLoaderTest : ShouldSpec({
                 val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, override = false)
 
                 config shouldNotBe null
-                config.tools shouldHaveSize 5
+                config.tools shouldHaveSize 5  // Still 5 tools, one replaced
 
-                val sendCommandTool = config.tools.find { it.name == "send_command" }
+                val sendCommandTool = config.tools.find { it.name == "send_control_command" }
                 sendCommandTool shouldNotBe null
-                sendCommandTool?.description shouldBe "Overridden send command tool"
+                sendCommandTool?.description shouldBe "Overridden control command tool"
                 sendCommandTool?.handler?.type shouldBe "custom_handler"
             } finally {
                 tempFile.delete()

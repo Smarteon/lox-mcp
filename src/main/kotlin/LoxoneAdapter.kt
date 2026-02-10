@@ -122,12 +122,16 @@ class LoxoneAdapter(
         return app
     }
 
-
     /**
-     * Execute a raw command string on the Loxone Miniserver.
+     * Send a raw command path to the Loxone Miniserver.
+     * Strips leading slash if present to ensure proper formatting.
+     *
+     * Use this for generic commands like "/jdev/sps/io/{uuid}/{action}"
      */
-    suspend fun callRaw(command: String): String {
-        return getClient().callRaw(command)
+    suspend fun sendRawCommand(commandPath: String): String {
+        val normalizedPath = commandPath.removePrefix("/")
+        logger.debug { "Sending raw command: $normalizedPath" }
+        return getClient().callRaw(normalizedPath)
     }
 
     /**
