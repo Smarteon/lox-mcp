@@ -35,7 +35,7 @@ class ConfigLoaderTest : ShouldSpec({
             )
 
             try {
-                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, override = true)
+                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = true)
 
                 config shouldNotBe null
                 config.tools shouldHaveSize 1
@@ -61,7 +61,7 @@ class ConfigLoaderTest : ShouldSpec({
 
             try {
                 val config = shouldNotThrowAny {
-                    ConfigLoader.load(customConfigPath = tempFile.absolutePath, override = true)
+                    ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = true)
                 }
 
                 config shouldNotBe null
@@ -102,7 +102,7 @@ class ConfigLoaderTest : ShouldSpec({
             )
 
             try {
-                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, override = false)
+                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = false)
 
                 config shouldNotBe null
                 config.tools shouldHaveSize 6  // 5 internal + 1 custom
@@ -137,7 +137,7 @@ class ConfigLoaderTest : ShouldSpec({
             )
 
             try {
-                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, override = true)
+                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = true)
 
                 config shouldNotBe null
                 config.tools shouldHaveSize 1
@@ -164,7 +164,7 @@ class ConfigLoaderTest : ShouldSpec({
             )
 
             try {
-                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, override = false)
+                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = false)
 
                 config shouldNotBe null
                 config.tools shouldHaveSize 5  // Still 5 tools, one replaced
@@ -194,7 +194,7 @@ class ConfigLoaderTest : ShouldSpec({
             )
 
             try {
-                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, override = false)
+                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = false)
 
                 config shouldNotBe null
                 config.resources shouldHaveSize 9

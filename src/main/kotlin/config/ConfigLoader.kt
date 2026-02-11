@@ -15,12 +15,12 @@ object ConfigLoader {
      * Load configuration with optional custom config file.
      *
      * @param customConfigPath Path to custom config file. If null, only internal config is loaded.
-     * @param override If true and customConfigPath is provided, only use custom config;
-     *                 if false, merge custom config with internal config
+     * @param overrideInternalConfig If true and customConfigPath is provided, only use custom config;
+     *                               if false, merge custom config with internal config
      * @return Loaded configuration (internal, custom, or merged)
      */
-    fun load(customConfigPath: String? = null, override: Boolean = false): McpConfig {
-        val internalConfig = if (override && customConfigPath != null) {
+    fun load(customConfigPath: String? = null, overrideInternalConfig: Boolean = false): McpConfig {
+        val internalConfig = if (overrideInternalConfig && customConfigPath != null) {
             logger.info { "Override mode enabled, skipping internal configuration" }
             McpConfig()
         } else {

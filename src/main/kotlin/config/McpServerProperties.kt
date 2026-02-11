@@ -21,6 +21,8 @@ object McpServerProperties {
     var overrideInternalConfig: Boolean = false
         private set
 
+    private var cachedConfig: McpConfig? = null
+
     /**
      * Initialize properties from command-line arguments.
      * Should be called once at application startup.
@@ -37,15 +39,21 @@ object McpServerProperties {
         this.resourcesAsTools = resourcesAsTools
         this.customConfigPath = customConfigPath
         this.overrideInternalConfig = overrideInternalConfig
+        cachedConfig = null
     }
 
     /**
      * Load MCP configuration (tools and resources) based on current properties.
+     * Result is cached to avoid re-parsing YAML on subsequent calls.
      */
     fun loadConfig(): McpConfig {
-        return ConfigLoader.load(
-            customConfigPath = customConfigPath,
-            override = overrideInternalConfig
-        )
+        return cachedConfig ?: run {
+            val config = ConfigLoader.load(
+                customConfigPath = customConfigPath,
+                overrideInternalConfig = overrideInternalConfig
+            )
+            cachedConfig = config
+            config
+        }
     }
 }
