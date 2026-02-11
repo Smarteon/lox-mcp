@@ -43,6 +43,11 @@ tools:
         type: string
         description: Optional device type filter (e.g., "Switch", "Dimmer", "Jalousie")
         required: false
+      - name: include_states
+        type: boolean
+        description: If true, include current state values for each device in the response
+        required: false
+        default: false
     handler:
       type: control_devices_by_room
 
@@ -61,6 +66,11 @@ tools:
         description: Action to perform on all matching devices
         required: true
         enum: [ "on", "off", "up", "down", "stop" ]
+      - name: include_states
+        type: boolean
+        description: If true, include current state values for each device in the response
+        required: false
+        default: false
     handler:
       type: control_devices_by_type
 
@@ -79,6 +89,11 @@ tools:
         description: Action to perform on all devices in the category
         required: true
         enum: [ "on", "off", "up", "down", "stop" ]
+      - name: include_states
+        type: boolean
+        description: If true, include current state values for each device in the response
+        required: false
+        default: false
     handler:
       type: control_devices_by_category
 

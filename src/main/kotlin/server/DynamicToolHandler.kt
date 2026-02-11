@@ -1,6 +1,8 @@
 package cz.smarteon.loxmcp.server
 
 import cz.smarteon.loxkt.app.Control
+import cz.smarteon.loxkt.state.TextState
+import cz.smarteon.loxkt.state.ValueState
 import cz.smarteon.loxmcp.Constants.HandlerTypes
 import cz.smarteon.loxmcp.LoxoneAdapter
 import cz.smarteon.loxmcp.config.ToolConfig
@@ -12,11 +14,18 @@ import cz.smarteon.loxmcp.server.LoxoneQueryHelper.getVisibleControlsForRoom
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
+import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonObject
+import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.contentOrNull
 import kotlinx.serialization.json.jsonPrimitive
+import kotlinx.serialization.json.put
+import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.putJsonObject
 
 private val logger = KotlinLogging.logger {}
+
+private val json = Json { prettyPrint = true }
 
 /**
  * Dynamic tool handler that executes tools based on YAML configuration.
@@ -61,6 +70,7 @@ class DynamicToolHandler(
         val roomName = getRequiredStringArg(arguments, "room") ?: return errorResult("Missing required parameter: room")
         val action = getRequiredStringArg(arguments, "action") ?: return errorResult("Missing required parameter: action")
         val deviceType = getOptionalStringArg(arguments, "device_type")
+        val includeStates = getOptionalBooleanArg(arguments, "include_states") ?: false
 
         val app = adapter.getApp()
         val room = app.findRoomByName(roomName)
@@ -73,12 +83,13 @@ class DynamicToolHandler(
             return errorResult("No devices found in room: $roomName")
         }
 
-        return executeCommandOnMultipleControls(controls, action, "Controlled ${controls.size} devices in $roomName")
+        return executeCommandOnMultipleControls(controls, action, "Controlled ${controls.size} devices in $roomName", includeStates)
     }
 
     private suspend fun handleControlDevicesByType(arguments: JsonObject): CallToolResult {
         val deviceType = getRequiredStringArg(arguments, "device_type") ?: return errorResult("Missing required parameter: device_type")
         val action = getRequiredStringArg(arguments, "action") ?: return errorResult("Missing required parameter: action")
+        val includeStates = getOptionalBooleanArg(arguments, "include_states") ?: false
 
         val app = adapter.getApp()
         val controls = app.getVisibleControlsByType(deviceType)
@@ -87,12 +98,13 @@ class DynamicToolHandler(
             return errorResult("No devices found of type: $deviceType")
         }
 
-        return executeCommandOnMultipleControls(controls, action, "Controlled ${controls.size} devices of type $deviceType")
+        return executeCommandOnMultipleControls(controls, action, "Controlled ${controls.size} devices of type $deviceType", includeStates)
     }
 
     private suspend fun handleControlDevicesByCategory(arguments: JsonObject): CallToolResult {
         val categoryName = getRequiredStringArg(arguments, "category") ?: return errorResult("Missing required parameter: category")
         val action = getRequiredStringArg(arguments, "action") ?: return errorResult("Missing required parameter: action")
+        val includeStates = getOptionalBooleanArg(arguments, "include_states") ?: false
 
         val app = adapter.getApp()
         val category = app.findCategoryByName(categoryName)
@@ -104,7 +116,12 @@ class DynamicToolHandler(
             return errorResult("No devices found in category: $categoryName")
         }
 
-        return executeCommandOnMultipleControls(controls, action, "Controlled ${controls.size} devices in category $categoryName")
+        return executeCommandOnMultipleControls(
+            controls,
+            action,
+            "Controlled ${controls.size} devices in category $categoryName",
+            includeStates
+        )
     }
 
     private suspend fun handleGenericCommand(arguments: JsonObject): CallToolResult {
@@ -125,19 +142,65 @@ class DynamicToolHandler(
     private suspend fun executeCommandOnMultipleControls(
         controls: List<Control>,
         action: String,
-        summaryMessage: String
+        summaryMessage: String,
+        includeStates: Boolean = false
     ): CallToolResult {
         val results = controls.map { control ->
-            try {
+            val status = try {
                 adapter.sendCommand(control.uuidAction, action)
-                "${control.name}: OK"
+                "OK"
             } catch (e: Exception) {
-                "${control.name}: ${e.message}"
+                "Error: ${e.message}"
+            }
+            buildControlResult(control, status, includeStates)
+        }
+
+        return if (includeStates) {
+            val response = buildJsonObject {
+                put("message", summaryMessage)
+                putJsonArray("devices") {
+                    results.forEach { add(it.jsonObject) }
+                }
+            }
+            successResult(json.encodeToString(JsonObject.serializer(), response))
+        } else {
+            successResult("$summaryMessage:\n${results.joinToString("\n") { it.text }}")
+        }
+    }
+
+    private suspend fun buildControlResult(
+        control: Control,
+        status: String,
+        includeStates: Boolean
+    ): ControlResult {
+        val jsonObject = buildJsonObject {
+            put("name", control.name)
+            put("uuid", control.uuidAction)
+            put("type", control.type)
+            put("status", status)
+
+            if (includeStates) {
+                val states = adapter.getControlStates(control)
+                if (states.isNotEmpty()) {
+                    putJsonObject("states") {
+                        states.forEach { (name, value) ->
+                            when (value) {
+                                is ValueState -> put(name, value.value)
+                                is TextState -> put(name, value.text)
+                                else -> put(name, value.toString())
+                            }
+                        }
+                    }
+                }
             }
         }
 
-        return successResult("$summaryMessage:\n${results.joinToString("\n")}")
+        val text = "  ${control.name} (${control.type}): $status"
+
+        return ControlResult(text, jsonObject)
     }
+
+    private data class ControlResult(val text: String, val jsonObject: JsonObject)
 
     private fun buildCommandFromTemplate(template: String, arguments: JsonObject): String {
         var command = template
@@ -173,6 +236,9 @@ class DynamicToolHandler(
 
     private fun getOptionalStringArg(arguments: JsonObject, key: String): String? =
         arguments[key]?.jsonPrimitive?.contentOrNull
+
+    private fun getOptionalBooleanArg(arguments: JsonObject, key: String): Boolean? =
+        arguments[key]?.jsonPrimitive?.contentOrNull?.toBooleanStrictOrNull()
 
     private fun successResult(message: String) = CallToolResult(
         content = listOf(TextContent(message)),
