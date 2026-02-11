@@ -1,7 +1,7 @@
 package cz.smarteon.loxmcp.server
 
 import cz.smarteon.loxmcp.LoxoneAdapter
-import cz.smarteon.loxmcp.config.ConfigLoader
+import cz.smarteon.loxmcp.config.McpServerProperties
 import cz.smarteon.loxmcp.config.ToolConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -18,13 +18,13 @@ private val logger = KotlinLogging.logger {}
  * Tools are loaded from YAML configuration for easy customization.
  */
 fun registerTools(server: Server, adapter: LoxoneAdapter) {
-    val config = ConfigLoader.loadFromResources()
+    val mcpConfig = McpServerProperties.loadConfig()
 
-    if (config.tools.isEmpty()) {
+    if (mcpConfig.tools.isEmpty()) {
         logger.warn { "No tools defined in configuration" }
     } else {
-        logger.info { "Registering ${config.tools.size} tools from configuration" }
-        config.tools.forEach { toolConfig ->
+        logger.info { "Registering ${mcpConfig.tools.size} tools from configuration" }
+        mcpConfig.tools.forEach { toolConfig ->
             registerTool(server, adapter, toolConfig)
         }
     }

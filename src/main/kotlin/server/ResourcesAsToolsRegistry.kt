@@ -1,7 +1,7 @@
 package cz.smarteon.loxmcp.server
 
 import cz.smarteon.loxmcp.LoxoneAdapter
-import cz.smarteon.loxmcp.config.ConfigLoader
+import cz.smarteon.loxmcp.config.McpServerProperties
 import cz.smarteon.loxmcp.config.ResourceConfig
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.modelcontextprotocol.kotlin.sdk.server.Server
@@ -29,15 +29,18 @@ private val URI_PARAM_PATTERN = "\\{([^}]+)}".toRegex()
  * - Static resources (no URI parameters) become no-argument tools
  * - Parameterized resources become tools with required string parameters
  * - Tool names are derived from handler type (e.g., "rooms_list" -> "get_rooms_list")
+ *
+ * @param server MCP server instance
+ * @param adapter Loxone adapter
  */
 fun registerResourcesAsTools(server: Server, adapter: LoxoneAdapter) {
-    val config = ConfigLoader.loadFromResources()
+    val mcpConfig = McpServerProperties.loadConfig()
 
-    if (config.resources.isEmpty()) {
+    if (mcpConfig.resources.isEmpty()) {
         logger.warn { "No resources defined in configuration to convert to tools" }
     } else {
-        logger.info { "Converting ${config.resources.size} resources to tools" }
-        config.resources.forEach { resourceConfig ->
+        logger.info { "Converting ${mcpConfig.resources.size} resources to tools" }
+        mcpConfig.resources.forEach { resourceConfig ->
             registerResourceAsTool(server, adapter, resourceConfig)
         }
     }

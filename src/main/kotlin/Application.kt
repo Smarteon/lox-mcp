@@ -1,5 +1,6 @@
 package cz.smarteon.loxmcp
 
+import cz.smarteon.loxmcp.config.McpServerProperties
 import cz.smarteon.loxmcp.credentials.CredentialResolver
 import cz.smarteon.loxmcp.credentials.LoxoneCredentials
 import cz.smarteon.loxmcp.server.createMcpServer
@@ -21,10 +22,12 @@ private val logger = KotlinLogging.logger {}
  * Parsed command-line arguments.
  */
 private data class AppArgs(
-    val mode: String = "--sse",
-    val port: Int = DEFAULT_PORT,
-    val resourcesAsTools: Boolean = false,
-    val originalArgs: Array<String> = emptyArray()
+    val mode: String,
+    val port: Int,
+    val resourcesAsTools: Boolean,
+    val configPath: String?,
+    val configOverride: Boolean,
+    val originalArgs: Array<String>
 ) {
     companion object {
         const val DEFAULT_PORT = 3001
@@ -33,6 +36,8 @@ private data class AppArgs(
             var mode = "--sse"
             var port = DEFAULT_PORT
             var resourcesAsTools = false
+            var configPath: String? = null
+            var configOverride = false
 
             var i = 0
             while (i < args.size) {
@@ -46,11 +51,20 @@ private data class AppArgs(
                         }
                     }
                     "--resources-as-tools" -> resourcesAsTools = true
+                    "-c", "--config" -> {
+                        configPath = args.getOrNull(i + 1)
+                        if (configPath == null) {
+                            logger.error { "Missing config file path after ${args[i]}" }
+                        } else {
+                            i++
+                        }
+                    }
+                    "-o", "--override" -> configOverride = true
                 }
                 i++
             }
 
-            return AppArgs(mode, port, resourcesAsTools, args)
+            return AppArgs(mode, port, resourcesAsTools, configPath, configOverride, args)
         }
     }
 }
@@ -58,36 +72,44 @@ private data class AppArgs(
 fun main(args: Array<String>) {
     val appArgs = AppArgs.parse(args)
 
+    McpServerProperties.initialize(
+        mode = appArgs.mode,
+        port = appArgs.port,
+        resourcesAsTools = appArgs.resourcesAsTools,
+        customConfigPath = appArgs.configPath,
+        overrideInternalConfig = appArgs.configOverride
+    )
+
     when (appArgs.mode) {
-        "--stdio" -> runStdioMode(appArgs.originalArgs, appArgs.resourcesAsTools)
-        "--sse", "--http" -> runHttpMode(appArgs.port, appArgs.originalArgs, appArgs.resourcesAsTools)
+        "--stdio" -> runStdioMode(appArgs.originalArgs)
+        "--sse", "--http" -> runHttpMode(appArgs.originalArgs)
         else -> {
             logger.error { "Invalid mode: ${appArgs.mode}. Use '--stdio' or '--http'" }
         }
     }
 }
 
-private fun runStdioMode(args: Array<String>, resourcesAsTools: Boolean) = runBlocking {
+private fun runStdioMode(args: Array<String>) = runBlocking {
     logger.info { "Starting Loxone MCP Server in STDIO mode" }
 
     val adapter = initAdapter(args)
     registerShutdownHook(adapter)
 
-    createStdioMcpServer(adapter, resourcesAsTools)
+    createStdioMcpServer(adapter)
 }
 
-private fun runHttpMode(port: Int, args: Array<String>, resourcesAsTools: Boolean) {
+private fun runHttpMode(args: Array<String>) {
     logger.info { "Starting Loxone MCP Server in HTTP/SSE mode" }
 
     embeddedServer(
         factory = Netty,
-        port = port,
+        port = McpServerProperties.port,
         host = "0.0.0.0",
-        module = { module(args, resourcesAsTools) }
+        module = { module(args) }
     ).start(wait = true)
 }
 
-fun Application.module(args: Array<String> = emptyArray(), resourcesAsTools: Boolean = false) {
+fun Application.module(args: Array<String> = emptyArray()) {
     install(ContentNegotiation) {
         json(Json {
             prettyPrint = true
@@ -98,7 +120,7 @@ fun Application.module(args: Array<String> = emptyArray(), resourcesAsTools: Boo
     val adapter = initAdapter(args)
     registerShutdownHook(adapter)
 
-    createMcpServer(adapter, resourcesAsTools)
+    createMcpServer(adapter)
 
     logger.info { "Loxone MCP Server started successfully" }
 }

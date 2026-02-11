@@ -151,6 +151,24 @@ lox-mcp/
 
 ## 🛠️ Configuration
 
+### Custom Configuration Files
+
+You can load custom configuration files using the `-c` or `--config` parameter. By default, custom configurations are **merged** with the internal configuration, allowing you to add or override specific tools and resources.
+
+#### Merge Mode (Default)
+
+```bash
+# Custom tools/resources are added to internal ones
+./gradlew run --args="--stdio -c /path/to/custom-config.yaml"
+```
+
+#### Override Mode
+
+```bash
+# Only use custom configuration, ignore internal config
+./gradlew run --args="--stdio -c /path/to/custom-config.yaml -o"
+```
+
 ### Tools and Resources
 
 Define tools and resources in `src/main/resources/mcp-config.yaml`:

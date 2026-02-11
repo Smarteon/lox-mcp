@@ -12,29 +12,11 @@ class ConfigLoaderTest : ShouldSpec({
 
     context("loadFromResources") {
         should("load valid configuration from resources") {
-            val config = ConfigLoader.loadFromResources("mcp-config.yaml")
+            val config = ConfigLoader.load()
 
             config shouldNotBe null
             config.tools shouldHaveSize 5
             config.resources shouldHaveSize 9
-        }
-
-        should("return default empty config when resource not found") {
-            val config = ConfigLoader.loadFromResources("nonexistent.yaml")
-
-            config shouldNotBe null
-            config.tools shouldHaveSize 0
-            config.resources shouldHaveSize 0
-        }
-
-        should("handle invalid YAML gracefully") {
-            val config = shouldNotThrowAny {
-                ConfigLoader.loadFromResources("invalid-config.yaml")
-            }
-
-            config shouldNotBe null
-            config.tools shouldHaveSize 0
-            config.resources shouldHaveSize 0
         }
     }
 
@@ -53,7 +35,7 @@ class ConfigLoaderTest : ShouldSpec({
             )
 
             try {
-                val config = ConfigLoader.load(tempFile.absolutePath)
+                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = true)
 
                 config shouldNotBe null
                 config.tools shouldHaveSize 1
@@ -65,12 +47,12 @@ class ConfigLoaderTest : ShouldSpec({
             }
         }
 
-        should("return default config when file not found") {
+        should("return internal config when file not found") {
             val config = ConfigLoader.load("nonexistent-file.yaml")
 
             config shouldNotBe null
-            config.tools shouldHaveSize 0
-            config.resources shouldHaveSize 0
+            config.tools shouldHaveSize 5
+            config.resources shouldHaveSize 9
         }
 
         should("handle malformed YAML gracefully") {
@@ -79,12 +61,148 @@ class ConfigLoaderTest : ShouldSpec({
 
             try {
                 val config = shouldNotThrowAny {
-                    ConfigLoader.load(tempFile.absolutePath)
+                    ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = true)
                 }
 
                 config shouldNotBe null
                 config.tools shouldHaveSize 0
                 config.resources shouldHaveSize 0
+            } finally {
+                tempFile.delete()
+            }
+        }
+    }
+
+    context("load with custom config") {
+        should("load only internal config when no custom config provided") {
+            val config = ConfigLoader.load()
+
+            config shouldNotBe null
+            config.tools shouldHaveSize 5
+            config.resources shouldHaveSize 9
+        }
+
+        should("merge custom config with internal config") {
+            val tempFile = Files.createTempFile("test-config", ".yaml").toFile()
+            tempFile.writeText(
+                """
+                tools:
+                  - name: custom_tool
+                    description: Custom tool
+                    handler:
+                      type: generic_command
+                resources:
+                  - uri: loxone://custom
+                    name: Custom Resource
+                    description: Custom resource
+                    mimeType: application/json
+                    handler:
+                      type: custom_handler
+                """.trimIndent()
+            )
+
+            try {
+                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = false)
+
+                config shouldNotBe null
+                config.tools shouldHaveSize 6  // 5 internal + 1 custom
+                config.resources shouldHaveSize 10  // 9 internal + 1 custom
+
+                // Verify custom tool is present
+                config.tools.any { it.name == "custom_tool" } shouldBe true
+                // Verify internal tools are still present
+                config.tools.any { it.name == "send_control_command" } shouldBe true
+            } finally {
+                tempFile.delete()
+            }
+        }
+
+        should("override internal config when override flag is true") {
+            val tempFile = Files.createTempFile("test-config", ".yaml").toFile()
+            tempFile.writeText(
+                """
+                tools:
+                  - name: custom_tool_only
+                    description: Only custom tool
+                    handler:
+                      type: send_control_command
+                resources:
+                  - uri: loxone://custom_only
+                    name: Only Custom Resource
+                    description: Only custom resource
+                    mimeType: application/json
+                    handler:
+                      type: custom_handler
+                """.trimIndent()
+            )
+
+            try {
+                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = true)
+
+                config shouldNotBe null
+                config.tools shouldHaveSize 1
+                config.resources shouldHaveSize 1
+
+                config.tools[0].name shouldBe "custom_tool_only"
+                config.resources[0].uri shouldBe "loxone://custom_only"
+            } finally {
+                tempFile.delete()
+            }
+        }
+
+        should("custom tool with same name overrides internal tool") {
+            val tempFile = Files.createTempFile("test-config", ".yaml").toFile()
+            tempFile.writeText(
+                """
+                tools:
+                  - name: send_control_command
+                    description: Overridden control command tool
+                    handler:
+                      type: custom_handler
+                resources: []
+                """.trimIndent()
+            )
+
+            try {
+                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = false)
+
+                config shouldNotBe null
+                config.tools shouldHaveSize 5  // Still 5 tools, one replaced
+
+                val sendCommandTool = config.tools.find { it.name == "send_control_command" }
+                sendCommandTool shouldNotBe null
+                sendCommandTool?.description shouldBe "Overridden control command tool"
+                sendCommandTool?.handler?.type shouldBe "custom_handler"
+            } finally {
+                tempFile.delete()
+            }
+        }
+
+        should("custom resource with same URI overrides internal resource") {
+            val tempFile = Files.createTempFile("test-config", ".yaml").toFile()
+            tempFile.writeText(
+                """
+                tools: []
+                resources:
+                  - uri: loxone://rooms
+                    name: Custom Rooms List
+                    description: Overridden rooms list
+                    mimeType: text/plain
+                    handler:
+                      type: custom_handler
+                """.trimIndent()
+            )
+
+            try {
+                val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = false)
+
+                config shouldNotBe null
+                config.resources shouldHaveSize 9
+
+                val roomsResource = config.resources.find { it.uri == "loxone://rooms" }
+                roomsResource shouldNotBe null
+                roomsResource?.name shouldBe "Custom Rooms List"
+                roomsResource?.handler?.type shouldBe "custom_handler"
             } finally {
                 tempFile.delete()
             }

@@ -1,5 +1,6 @@
 package cz.smarteon.loxmcp.server
 
+import cz.smarteon.loxkt.app.Control
 import cz.smarteon.loxmcp.Constants.HandlerTypes
 import cz.smarteon.loxmcp.LoxoneAdapter
 import cz.smarteon.loxmcp.config.ToolConfig
@@ -28,11 +29,11 @@ class DynamicToolHandler(
     suspend fun handle(arguments: JsonObject): CallToolResult {
         return try {
             when (toolConfig.handler.type) {
-                HandlerTypes.SEND_COMMAND -> handleSendCommand(arguments)
                 HandlerTypes.CONTROL_DEVICE -> handleControlDevice(arguments)
                 HandlerTypes.CONTROL_DEVICES_BY_ROOM -> handleControlDevicesByRoom(arguments)
                 HandlerTypes.CONTROL_DEVICES_BY_TYPE -> handleControlDevicesByType(arguments)
                 HandlerTypes.CONTROL_DEVICES_BY_CATEGORY -> handleControlDevicesByCategory(arguments)
+                HandlerTypes.GENERIC_COMMAND -> handleGenericCommand(arguments)
                 else -> CallToolResult(
                     content = listOf(TextContent("Unknown handler type: ${toolConfig.handler.type}")),
                     isError = true
@@ -47,26 +48,13 @@ class DynamicToolHandler(
         }
     }
 
-    private suspend fun handleSendCommand(arguments: JsonObject): CallToolResult {
-        val uuid = getRequiredStringArg(arguments, "uuid") ?: return errorResult("Missing required parameter: uuid")
-        val command = getRequiredStringArg(arguments, "command") ?: return errorResult("Missing required parameter: command")
-
-        val response = adapter.sendCommand(uuid, command)
-        return successResult("Command sent successfully: $response")
-    }
-
     private suspend fun handleControlDevice(arguments: JsonObject): CallToolResult {
         val deviceId = getRequiredStringArg(arguments, "device_id") ?: return errorResult("Missing required parameter: device_id")
         val action = getRequiredStringArg(arguments, "action") ?: return errorResult("Missing required parameter: action")
         val value = getOptionalStringArg(arguments, "value")
 
-        val response = if (value != null) {
-            adapter.sendCommand(deviceId, "$action/$value")
-        } else {
-            adapter.sendCommand(deviceId, action)
-        }
-
-        return successResult("Device $deviceId $action: $response")
+        val command = if (value != null) "$action/$value" else action
+        return executeCommand(deviceId, command, "Device $deviceId $action")
     }
 
     private suspend fun handleControlDevicesByRoom(arguments: JsonObject): CallToolResult {
@@ -85,16 +73,7 @@ class DynamicToolHandler(
             return errorResult("No devices found in room: $roomName")
         }
 
-        val results = controls.map { control ->
-            try {
-                adapter.sendCommand(control.uuidAction, action)
-                "${control.name}: OK"
-            } catch (e: Exception) {
-                "${control.name}: ${e.message}"
-            }
-        }
-
-        return successResult("Controlled ${controls.size} devices in $roomName:\n${results.joinToString("\n")}")
+        return executeCommandOnMultipleControls(controls, action, "Controlled ${controls.size} devices in $roomName")
     }
 
     private suspend fun handleControlDevicesByType(arguments: JsonObject): CallToolResult {
@@ -108,16 +87,7 @@ class DynamicToolHandler(
             return errorResult("No devices found of type: $deviceType")
         }
 
-        val results = controls.map { control ->
-            try {
-                adapter.sendCommand(control.uuidAction, action)
-                "${control.name}: OK"
-            } catch (e: Exception) {
-                "${control.name}: ${e.message}"
-            }
-        }
-
-        return successResult("Controlled ${controls.size} devices of type $deviceType:\n${results.joinToString("\n")}")
+        return executeCommandOnMultipleControls(controls, action, "Controlled ${controls.size} devices of type $deviceType")
     }
 
     private suspend fun handleControlDevicesByCategory(arguments: JsonObject): CallToolResult {
@@ -134,6 +104,29 @@ class DynamicToolHandler(
             return errorResult("No devices found in category: $categoryName")
         }
 
+        return executeCommandOnMultipleControls(controls, action, "Controlled ${controls.size} devices in category $categoryName")
+    }
+
+    private suspend fun handleGenericCommand(arguments: JsonObject): CallToolResult {
+        val commandTemplate = toolConfig.handler.commandTemplate
+            ?: return errorResult("Generic command handler requires 'commandTemplate'")
+
+        val command = buildCommandFromTemplate(commandTemplate, arguments)
+        val response = adapter.sendRawCommand(command)
+
+        return successResult("Command executed: $command\nResponse: $response")
+    }
+
+    private suspend fun executeCommand(uuid: String, command: String, successMessage: String): CallToolResult {
+        val response = adapter.sendCommand(uuid, command)
+        return successResult("$successMessage: $response")
+    }
+
+    private suspend fun executeCommandOnMultipleControls(
+        controls: List<Control>,
+        action: String,
+        summaryMessage: String
+    ): CallToolResult {
         val results = controls.map { control ->
             try {
                 adapter.sendCommand(control.uuidAction, action)
@@ -143,7 +136,36 @@ class DynamicToolHandler(
             }
         }
 
-        return successResult("Controlled ${controls.size} devices in category $categoryName:\n${results.joinToString("\n")}")
+        return successResult("$summaryMessage:\n${results.joinToString("\n")}")
+    }
+
+    private fun buildCommandFromTemplate(template: String, arguments: JsonObject): String {
+        var command = template
+
+        // Find all placeholders in the template
+        val placeholderPattern = "\\{([^}]+)}".toRegex()
+        val placeholders = placeholderPattern.findAll(template).map { it.groupValues[1] }.toList()
+
+        // Replace each placeholder with its value from arguments or default
+        for (placeholder in placeholders) {
+            val paramConfig = toolConfig.parameters.find { it.name == placeholder }
+            val argValue = arguments[placeholder]?.jsonPrimitive?.contentOrNull
+
+            val value = when {
+                argValue != null -> argValue
+                paramConfig?.default != null -> paramConfig.default!!
+                paramConfig?.required == true -> throw IllegalArgumentException(
+                    "Missing required parameter '$placeholder' for command template"
+                )
+                else -> throw IllegalArgumentException(
+                    "Missing value for placeholder '$placeholder' and no default configured"
+                )
+            }
+
+            command = command.replace("{$placeholder}", value)
+        }
+
+        return command
     }
 
     private fun getRequiredStringArg(arguments: JsonObject, key: String): String? =
