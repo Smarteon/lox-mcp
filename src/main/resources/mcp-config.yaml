@@ -43,6 +43,11 @@ tools:
         type: string
         description: Optional device type filter (e.g., "Switch", "Dimmer", "Jalousie")
         required: false
+      - name: include_states
+        type: boolean
+        description: If true, include current state values for each device in the response
+        required: false
+        default: false
     handler:
       type: control_devices_by_room
 
@@ -61,6 +66,11 @@ tools:
         description: Action to perform on all matching devices
         required: true
         enum: [ "on", "off", "up", "down", "stop" ]
+      - name: include_states
+        type: boolean
+        description: If true, include current state values for each device in the response
+        required: false
+        default: false
     handler:
       type: control_devices_by_type
 
@@ -79,6 +89,11 @@ tools:
         description: Action to perform on all devices in the category
         required: true
         enum: [ "on", "off", "up", "down", "stop" ]
+      - name: include_states
+        type: boolean
+        description: If true, include current state values for each device in the response
+        required: false
+        default: false
     handler:
       type: control_devices_by_category
 
@@ -203,3 +218,46 @@ resources:
     mimeType: application/json
     handler:
       type: structure_file_object
+
+  # Device states - all devices with optional filtering
+  - uri: loxone://devices/states
+    name: All Device States
+    description: |
+      Get current state values for all devices in the Loxone system.
+      Returns real-time state information like temperatures, switch states, positions, etc.
+      
+      Optional query parameters:
+        - ?filter=<name> - Filter devices by name (case-insensitive)
+        - ?room=<roomName> - Filter devices by room name
+        - ?type=<deviceType> - Filter devices by type
+        - ?category=<categoryName> - Filter devices by category
+      
+      Examples:
+        - loxone://devices/states - Get all device states
+        - loxone://devices/states?filter=kitchen - Devices with "kitchen" in name
+        - loxone://devices/states?room=Kitchen - All devices in Kitchen room
+        - loxone://devices/states?type=Switch - All Switch type devices
+    mimeType: application/json
+    handler:
+      type: all_device_states
+
+  # Single device state by UUID
+  - uri: loxone://devices/{deviceUuid}/state
+    name: Device State
+    description: |
+      Get current state values for a specific device by its UUID.
+      Returns all state values for the device (temperature, position, active status, etc.)
+      
+      Common state names by device type:
+        - Switch: active (0=off, 1=on)
+        - Dimmer: position (0-100), active (0/1)
+        - IRoomControllerV2: tempActual, tempTarget, mode
+        - Jalousie: position, shadePosition
+        - Alarm: armed, armedDelay, triggered
+      
+      Replace {deviceUuid} with the device UUID from the devices list.
+      Example: loxone://devices/12345678-1234-1234-1234-123456789abc/state
+    mimeType: application/json
+    handler:
+      type: device_state
+
