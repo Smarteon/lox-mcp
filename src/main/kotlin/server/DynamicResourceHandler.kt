@@ -43,6 +43,7 @@ class DynamicResourceHandler(
 
     private val json = Json { prettyPrint = true }
 
+    @Suppress("CyclomaticComplexMethod")
     suspend fun handle(uri: String): ReadResourceResult {
         return try {
             when (resourceConfig.handler.type) {
@@ -53,8 +54,9 @@ class DynamicResourceHandler(
                 HandlerTypes.DEVICES_BY_CATEGORY -> handleDevicesByCategory(uri)
                 HandlerTypes.CATEGORIES_LIST -> handleCategoriesList()
                 HandlerTypes.STRUCTURE_SUMMARY -> handleStructureSummary()
-                HandlerTypes.STRUCTURE_FILE_LIST -> LoxoneDocsProvider.handleControlsList(uri)
-                HandlerTypes.STRUCTURE_FILE_OBJECT -> LoxoneDocsProvider.handleControlDetails(uri)
+                HandlerTypes.DOCS_TOC -> withDocsVersion { LoxoneDocsProvider.handleDocsToc(uri, it) }
+                HandlerTypes.DOCS_CONTROLS -> withDocsVersion { LoxoneDocsProvider.handleDocsControlsList(uri, it) }
+                HandlerTypes.DOCS_TOPIC -> withDocsVersion { LoxoneDocsProvider.handleDocsTopic(uri, it) }
                 HandlerTypes.ALL_DEVICE_STATES -> handleAllDeviceStates(uri)
                 HandlerTypes.DEVICE_STATE -> handleDeviceState(uri)
                 else -> errorResult(uri, "Unknown handler type: ${resourceConfig.handler.type}")
@@ -300,6 +302,9 @@ class DynamicResourceHandler(
             else -> put(name, value.toString())
         }
     }
+
+    private suspend fun withDocsVersion(block: (String?) -> ReadResourceResult): ReadResourceResult =
+        block(adapter.getMiniserverVersion())
 
     private fun successResult(uri: String, content: String, mimeType: String) = ReadResourceResult(
         contents = listOf(

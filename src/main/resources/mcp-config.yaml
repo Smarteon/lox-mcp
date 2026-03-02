@@ -196,28 +196,64 @@ resources:
     handler:
       type: categories_list
 
-  # Structure file - list of all object types
-  - uri: loxone://structure-file/objects
-    name: Structure File Objects
+  # Loxone docs - Table of Contents
+  - uri: loxone://docs
+    name: Loxone Docs - Table of Contents
     description: |
-      List of all Loxone object types from the official structure file.
-      Each object type (e.g., Hourcounter, InfoOnlyAnalog) has states, commands, and details.
-      Use this to understand what data is available for different device types.
-    mimeType: application/json
-    handler:
-      type: structure_file_list
+      Table of Contents for the Loxone Structure File documentation.
+      Lists all top-level sections: general topics (rooms, globalStates, msInfo, etc.)
+      and all control types (Switch, Dimmer, Jalousie, etc.).
 
-  # Structure file - specific object details
-  - uri: loxone://structure-file/object/{objectName}
-    name: Structure File Object Details
-    description: |
-      Detailed information about a specific Loxone object type.
-      Shows all states (data fields), commands, and configuration details.
-      Replace {objectName} with the object type name (e.g., Hourcounter, InfoOnlyAnalog).
-      Example: loxone://structure-file/object/Hourcounter
+      Each entry includes a `detailUri` field — use that URI to read the full documentation
+      for that topic. Think of this as a clickable TOC:
+        - General sections → loxone://docs/topic/{name}  (e.g. loxone://docs/topic/rooms)
+        - Control types    → loxone://docs/topic/{name}  (e.g. loxone://docs/topic/Switch)
+
+      Start here to discover what documentation is available.
     mimeType: application/json
     handler:
-      type: structure_file_object
+      type: docs_toc
+
+  # Loxone docs - flat list of all control types
+  - uri: loxone://docs/controls
+    name: Loxone Docs - All Controls
+    description: |
+      Flat list of every control type documented in the Loxone Structure File,
+      including nested sub-controls (e.g. "BMW Wallbox specific" under "CarCharger").
+
+      Each entry includes:
+        - name: the control type name
+        - description: brief description
+        - detailsCount / statesCount / commandsCount: how much data is available
+        - detailUri: use this URI to read the full documentation for that control
+
+      Use this when you know you're looking for a control type and want to scan all options.
+      Example: loxone://docs/topic/SteakThermo
+    mimeType: application/json
+    handler:
+      type: docs_controls
+
+  # Loxone docs - topic detail (controls and general sections)
+  - uri: loxone://docs/topic/{name}
+    name: Loxone Docs - Topic Detail
+    description: |
+      Full documentation for a named topic — works for both control types and general sections.
+
+      For control types (e.g. Switch, Dimmer, SteakThermo):
+        Returns details, states, and commands with full descriptions and enum values.
+
+      For general sections (e.g. rooms, globalStates, msInfo):
+        Returns field descriptions and nested sub-sections.
+
+      Replace {name} with the exact name from the Table of Contents or controls list.
+      Examples:
+        - loxone://docs/topic/Switch
+        - loxone://docs/topic/rooms
+        - loxone://docs/topic/SteakThermo
+        - loxone://docs/topic/Jalousie
+    mimeType: application/json
+    handler:
+      type: docs_topic
 
   # Device states - all devices with optional filtering
   - uri: loxone://devices/states

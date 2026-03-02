@@ -42,8 +42,9 @@ object Constants {
         const val DEVICES_BY_CATEGORY = "devices_by_category"
         const val CATEGORIES_LIST = "categories_list"
         const val STRUCTURE_SUMMARY = "structure_summary"
-        const val STRUCTURE_FILE_LIST = "structure_file_list"
-        const val STRUCTURE_FILE_OBJECT = "structure_file_object"
+        const val DOCS_TOC = "docs_toc"
+        const val DOCS_CONTROLS = "docs_controls"
+        const val DOCS_TOPIC = "docs_topic"
         const val ALL_DEVICE_STATES = "all_device_states"
         const val DEVICE_STATE = "device_state"
     }
