@@ -40,7 +40,6 @@ dependencies {
 
     implementation(libs.kotlin.logging)
     implementation(libs.slf4j.simple)
-    implementation(libs.pdfbox)
 
     testImplementation(libs.kotest.runner.junit5)
     testImplementation(libs.kotest.assertions.core)
@@ -81,8 +80,16 @@ tasks {
         }
     }
 
+    val copyLoxoneDocs by registering(Copy::class) {
+        from("loxone-docs") {
+            include("*.json")
+        }
+        into(layout.buildDirectory.dir("resources/main/loxone-docs"))
+    }
+
+
     withType<ShadowJar>().configureEach {
-        dependsOn(generateVersionFile)
+        dependsOn(generateVersionFile, copyLoxoneDocs)
         archiveBaseName.set("lox-mcp")
         archiveClassifier.set("all")
         mergeServiceFiles()
@@ -111,7 +118,7 @@ tasks {
     }
 
     processResources {
-        dependsOn(generateVersionFile)
+        dependsOn(generateVersionFile, copyLoxoneDocs)
         from(generateVersionFile) {
             into(".")
         }
