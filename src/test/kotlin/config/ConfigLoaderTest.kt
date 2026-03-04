@@ -16,7 +16,7 @@ class ConfigLoaderTest : ShouldSpec({
 
             config shouldNotBe null
             config.tools shouldHaveSize 5
-            config.resources shouldHaveSize 11
+            config.resources shouldHaveSize 12
         }
     }
 
@@ -52,7 +52,7 @@ class ConfigLoaderTest : ShouldSpec({
 
             config shouldNotBe null
             config.tools shouldHaveSize 5
-            config.resources shouldHaveSize 11
+            config.resources shouldHaveSize 12
         }
 
         should("handle malformed YAML gracefully") {
@@ -79,7 +79,7 @@ class ConfigLoaderTest : ShouldSpec({
 
             config shouldNotBe null
             config.tools shouldHaveSize 5
-            config.resources shouldHaveSize 11
+            config.resources shouldHaveSize 12
         }
 
         should("merge custom config with internal config") {
@@ -106,7 +106,7 @@ class ConfigLoaderTest : ShouldSpec({
 
                 config shouldNotBe null
                 config.tools shouldHaveSize 6  // 5 internal + 1 custom
-                config.resources shouldHaveSize 12  // 11 internal + 1 custom
+                config.resources shouldHaveSize 13  // 12 internal + 1 custom
 
                 // Verify custom tool is present
                 config.tools.any { it.name == "custom_tool" } shouldBe true
@@ -197,7 +197,7 @@ class ConfigLoaderTest : ShouldSpec({
                 val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = false)
 
                 config shouldNotBe null
-                config.resources shouldHaveSize 11
+                config.resources shouldHaveSize 12
 
                 val roomsResource = config.resources.find { it.uri == "loxone://rooms" }
                 roomsResource shouldNotBe null

@@ -15,6 +15,7 @@ import cz.smarteon.loxkt.callForMsg
 import cz.smarteon.loxkt.ktor.KtorWebsocketLoxoneClient
 import cz.smarteon.loxkt.state.collectFrom
 import cz.smarteon.loxkt.app.getAllValues
+import cz.smarteon.loxkt.message.ApiInfo
 import io.github.oshai.kotlinlogging.KotlinLogging
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -41,6 +42,7 @@ class LoxoneAdapter(
 ) {
     private var client: LoxoneClient? = null
     private var cachedApp: LoxoneApp? = null
+    private var cachedVersion: String? = null
 
     private val state = LoxoneState()
     private var wsClient: KtorWebsocketLoxoneClient? = null
@@ -125,6 +127,25 @@ class LoxoneAdapter(
     }
 
     /**
+     * Get the Miniserver firmware version string (e.g., "16.0.2.30").
+     * Results are cached after first retrieval.
+     */
+    suspend fun getMiniserverVersion(): String? {
+        cachedVersion?.let { return it }
+
+        return try {
+            val apiInfo = getClient().callForMsg(ApiInfo.command)
+            apiInfo.version.also {
+                cachedVersion = it
+                logger.info { "Miniserver firmware version: $it" }
+            }
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to get Miniserver version" }
+            null
+        }
+    }
+
+    /**
      * Get the LoxoneApp structure file.
      * This contains all rooms, controls, and categories.
      * Results are cached after first retrieval.
@@ -206,6 +227,7 @@ class LoxoneAdapter(
         client?.close()
         client = null
         cachedApp = null
+        cachedVersion = null
         logger.info { "Disconnected from Loxone Miniserver" }
     }
 

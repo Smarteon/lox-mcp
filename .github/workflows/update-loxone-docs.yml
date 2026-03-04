@@ -1,0 +1,63 @@
+name: Update Loxone Docs
+
+on:
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force re-parse and commit even if this version already exists"
+        required: false
+        default: false
+        type: boolean
+  schedule:
+    # Run every Monday at 3:00 AM UTC
+    - cron: '0 3 * * 1'
+
+jobs:
+  update-docs:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          token: ${{ secrets.SMARTEON_GIT_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install Python dependencies
+        run: pip install pdfplumber requests
+
+      - name: Set up git configuration
+        run: |
+          git config --global user.name 'Smarteon Git'
+          git config --global user.email 'accounts+git@smarteon.cz'
+
+      - name: Parse Loxone Structure File PDF and generate JSON
+        env:
+          DOCS_FORCE: ${{ inputs.force }}
+        run: python .github/scripts/parse-loxone-docs.py
+
+      - name: Check for changes
+        id: changes
+        run: |
+          VERSION=$(cat .detected_docs_version 2>/dev/null || echo "")
+          git add loxone-docs/
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "No changes detected — docs for version ${VERSION} are already up to date"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+            echo "docs_version=$VERSION" >> "$GITHUB_OUTPUT"
+            echo "Changes detected for version $VERSION"
+          fi
+
+      - name: Commit and push
+        if: steps.changes.outputs.changed == 'true'
+        run: |
+          git commit -m "chore: update loxone structure file docs v${{ steps.changes.outputs.docs_version }}"
+          git push

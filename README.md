@@ -14,6 +14,7 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that c
 - 📝 **Configuration-Driven** - Define tools and resources in YAML without code changes
 - 🎯 **Dynamic Registration** - Tools and resources automatically loaded from configuration
 - 🚀 **Dual Transport** - Support for both STDIO and HTTP/SSE modes
+- 📚 **Built-in Loxone Docs** - Versioned Structure File documentation served as browsable resources
 - 🧹 **Clean Architecture** - Type-safe Kotlin codebase with proper resource management
 - 📦 **Easy Integration** - Works with Claude Desktop, Cline, GitHub Copilot Chat, and more
 
@@ -129,14 +130,17 @@ Configure in Cline's MCP settings using the same format.
 lox-mcp/
 ├── src/main/kotlin/
 │   ├── Application.kt              # Entry point, command-line parsing
-│   ├── Constants.kt                # Application constants (version, JSON config)
-│   ├── LoxoneAdapter.kt            # Wraps Loxone HTTP client
+│   ├── Constants.kt                # Application constants and handler type names
+│   ├── LoxoneAdapter.kt            # Wraps Loxone HTTP/WebSocket client
 │   ├── credentials/
 │   │   ├── CredentialSource.kt     # Credential source interface and implementations
 │   │   └── CredentialResolver.kt   # Resolves credentials from sources
 │   ├── config/
 │   │   ├── Models.kt               # Config data classes
 │   │   └── ConfigLoader.kt         # YAML config loading
+│   ├── loxonedocs/
+│   │   ├── LoxoneDocsProvider.kt   # Loads and serves versioned docs bundles
+│   │   └── Models.kt               # Docs data models (ControlDoc, DocSection, etc.)
 │   └── server/
 │       ├── McpServer.kt            # MCP server setup (STDIO & HTTP/SSE)
 │       ├── ToolsRegistry.kt        # Registers tools from config
@@ -145,6 +149,12 @@ lox-mcp/
 │       └── DynamicResourceHandler.kt # Provides resource content
 ├── src/main/resources/
 │   └── mcp-config.yaml             # Tools and resources configuration
+├── loxone-docs/
+│   ├── versions.json               # Index of available parsed docs versions
+│   └── structure-file-{ver}.json   # Pre-parsed Structure File docs (CI-generated)
+├── .github/
+│   ├── scripts/parse-loxone-docs.py  # Python script that parses the Loxone PDF
+│   └── workflows/update-loxone-docs.yml # Weekly CI job to refresh docs
 ├── build.gradle.kts                # Gradle build configuration
 ├── gradle/libs.versions.toml       # Dependency versions
 └── README.md                       # This file
@@ -164,7 +174,7 @@ The server exposes these MCP tools for controlling Loxone devices:
 
 ### Available Resources
 
-Resources provide read-only access to Loxone system data:
+Resources provide read-only access to Loxone system data and documentation:
 
 | Resource URI | Description |
 |--------------|-------------|
@@ -175,8 +185,11 @@ Resources provide read-only access to Loxone system data:
 | `loxone://devices/type/{type}` | Devices filtered by type (e.g., Switch, Dimmer) |
 | `loxone://devices/category/{name}` | Devices filtered by category |
 | `loxone://categories` | List of all categories |
-| `loxone://devices/states` | **Real-time state values for all devices** |
-| `loxone://devices/{uuid}/state` | **State values for a specific device** |
+| `loxone://devices/states` | Real-time state values for all devices |
+| `loxone://devices/{uuid}/state` | State values for a specific device |
+| `loxone://docs` | **Loxone docs TOC** — browse all documented sections and controls |
+| `loxone://docs/controls` | **Flat list of all control types** with detail links |
+| `loxone://docs/topic/{name}` | **Full docs for a control or general section** (e.g. `Switch`, `rooms`) |
 
 ### Custom Configuration Files
 
