@@ -47,5 +47,6 @@ object Constants {
         const val DOCS_TOPIC = "docs_topic"
         const val ALL_DEVICE_STATES = "all_device_states"
         const val DEVICE_STATE = "device_state"
+        const val STATISTICS = "statistics"
     }
 }

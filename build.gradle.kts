@@ -25,7 +25,8 @@ repositories {
 }
 
 dependencies {
-    implementation("cz.smarteon.loxone:loxone-client-kotlin-jvm:0.7.0")
+    implementation("cz.smarteon.loxone:loxone-client-kotlin-jvm:0.7.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-datetime:0.6.1")
     implementation("io.modelcontextprotocol:kotlin-sdk:0.11.1")
 
     implementation(libs.ktor.server.core)

@@ -297,3 +297,39 @@ resources:
     handler:
       type: device_state
 
+  # Statistics — one or more controls, arbitrary time range
+  - uri: loxone://statistics
+    name: Device Statistics
+    description: |
+      Fetch historical statistics for one or more Loxone controls.
+
+      Query parameters (all repeatable to query multiple controls in one request):
+        - uuid   (required, repeatable) — UUID of the control (uuidAction from the devices list)
+        - from   (required, repeatable) — start of time range as ISO 8601 string (e.g. 2024-11-15T00:00:00Z)
+        - to     (required, repeatable) — end of time range as ISO 8601 string (e.g. 2024-11-22T00:00:00Z)
+        - unit   (optional, once)       — aggregation resolution for V2 controls:
+                                          ALL | HOUR | DAY | MONTH | YEAR  (default: DAY)
+
+      The i-th uuid is paired with the i-th from and to, so every uuid must have
+      exactly one corresponding from and to value.
+
+      V1 controls use the Loxone epoch (2009-01-01) for their timestamps;
+      from/to are still supplied as ISO 8601 strings and handled automatically.
+
+      Examples:
+        - Single control, last 7 days:
+            loxone://statistics?uuid=abc123&from=2025-02-16T00:00:00Z&to=2025-02-23T00:00:00Z
+
+        - Two controls, same window, monthly aggregation:
+            loxone://statistics?uuid=abc123&from=2025-01-01T00:00:00Z&to=2025-02-23T00:00:00Z&uuid=def456&from=2025-01-01T00:00:00Z&to=2025-02-23T00:00:00Z&unit=MONTH
+
+      Each entry in the returned array contains:
+        - uuid, name, type
+        - statisticVersion: "v1" or "v2"
+        - unit: the aggregation unit used
+        - entryCount: number of data points returned
+        - labels: output/data-point names for value columns
+        - entries: array of { timestamp, values[] }
+    mimeType: application/json
+    handler:
+      type: statistics
