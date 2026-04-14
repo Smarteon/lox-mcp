@@ -162,6 +162,16 @@ class LoxoneAdapter(
     }
 
     /**
+     * Fetch raw bytes from a Loxone Miniserver path.
+     * Used for binary endpoints such as the project config file.
+     */
+    suspend fun fetchRawBytes(path: String): ByteArray {
+        val normalizedPath = path.removePrefix("/")
+        logger.debug { "Fetching raw bytes: $normalizedPath" }
+        return getClient().callRawForData(normalizedPath)
+    }
+
+    /**
      * Send a raw command path to the Loxone Miniserver.
      * Strips leading slash if present to ensure proper formatting.
      *

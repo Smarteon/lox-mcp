@@ -15,7 +15,7 @@ private val logger = KotlinLogging.logger {}
 
 /**
  * Registers all MCP tools that expose Loxone functionality to AI assistants.
- * Tools are loaded from YAML configuration for easy customization.
+ * Includes both YAML-configured dynamic tools and built-in hardcoded tools.
  */
 fun registerTools(server: Server, adapter: LoxoneAdapter) {
     val mcpConfig = McpServerProperties.loadConfig()
@@ -28,6 +28,29 @@ fun registerTools(server: Server, adapter: LoxoneAdapter) {
             registerTool(server, adapter, toolConfig)
         }
     }
+
+    registerGetLoxoneXmlTool(server, adapter)
+}
+
+/**
+ * Registers the built-in `get_loxone_xml` tool.
+ * Fetches, decompresses, and optionally slims the Loxone project XML.
+ */
+private fun registerGetLoxoneXmlTool(server: Server, adapter: LoxoneAdapter) {
+    val handler = GetLoxoneXmlHandler(adapter)
+
+    server.addTool(
+        name = "get_loxone_xml",
+        description = "Fetch the Loxone Miniserver project configuration as XML. " +
+            "Returns the complete automation logic: all rooms, devices, programs, users, " +
+            "categories, schedules, and wiring. " +
+            "UI-only elements and attributes are stripped to keep the XML within LLM context limits.",
+        inputSchema = ToolSchema()
+    ) { _ ->
+        handler.handle()
+    }
+
+    logger.info { "Registered built-in tool 'get_loxone_xml'" }
 }
 
 /**
