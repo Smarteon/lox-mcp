@@ -2,7 +2,8 @@
 
 A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that connects AI assistants to Loxone Miniserver smart home systems.
 
-[![License](https://img.shields.io/badge/License-BSD_3--Clause-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/License-AGPL_3.0-blue.svg)](LICENSE)
+[![Commercial License](https://img.shields.io/badge/Commercial_License-Available-red.svg)](COMMERCIAL_LICENSE)
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.20-purple.svg)](https://kotlinlang.org/)
 [![MCP SDK](https://img.shields.io/badge/MCP_SDK-0.7.2-green.svg)](https://modelcontextprotocol.io/)
 
@@ -259,7 +260,30 @@ See `docs/DEVELOPER_GUIDE.md` for detailed documentation.
 
 ## 📄 License
 
-This project is licensed under the BSD 3-Clause License - see the [LICENSE](LICENSE) file for details.
+This project uses a **dual licensing** model:
+
+### Open Source (Free)
+Use under the **AGPL-3.0** license for:
+- Personal use
+- Internal use
+- Open source projects
+- Commercial use, provided you comply with the AGPL-3.0 terms
+
+If you modify the software and distribute it, or offer it for use over a network, you must comply with the AGPL-3.0 requirements, including providing corresponding source code when applicable.
+
+See the [LICENSE](LICENSE) file for full AGPL-3.0 license text.
+
+### Commercial License
+If you want to use, modify, distribute, or offer this software as part of a proprietary or closed-source product/service without complying with the AGPL-3.0 obligations, you can obtain a **commercial license**. Contact:
+
+**info@smarteon.cz**
+
+Typical cases for a commercial license include:
+- Closed-source / proprietary products
+- SaaS or web services where you do not want to provide source code under AGPL-3.0
+- Commercial offerings where you want to keep modifications proprietary
+
+See [COMMERCIAL_LICENSE](COMMERCIAL_LICENSE) for details.
 
 ## 🔗 Related Projects
 
