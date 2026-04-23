@@ -2,6 +2,8 @@ package cz.smarteon.loxmcp.server
 
 import cz.smarteon.loxkt.app.Control
 import cz.smarteon.loxkt.app.LoxoneApp
+import cz.smarteon.loxkt.app.StatisticEntry
+import cz.smarteon.loxkt.app.StatisticUnit
 import cz.smarteon.loxkt.app.getVisibleControls
 import cz.smarteon.loxkt.state.TextState
 import cz.smarteon.loxkt.state.ValueState
@@ -20,8 +22,10 @@ import cz.smarteon.loxmcp.loxonedocs.LoxoneDocsProvider
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
+import kotlinx.datetime.Instant
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
+import kotlinx.serialization.json.JsonElement
 import kotlinx.serialization.json.JsonObject
 import kotlinx.serialization.json.JsonObjectBuilder
 import kotlinx.serialization.json.JsonPrimitive
@@ -30,6 +34,7 @@ import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
 import java.net.URLDecoder.decode
+import java.util.Locale
 
 private val logger = KotlinLogging.logger {}
 
@@ -59,6 +64,7 @@ class DynamicResourceHandler(
                 HandlerTypes.DOCS_TOPIC -> withDocsVersion { LoxoneDocsProvider.handleDocsTopic(uri, it) }
                 HandlerTypes.ALL_DEVICE_STATES -> handleAllDeviceStates(uri)
                 HandlerTypes.DEVICE_STATE -> handleDeviceState(uri)
+                HandlerTypes.STATISTICS -> handleStatistics(uri)
                 else -> errorResult(uri, "Unknown handler type: ${resourceConfig.handler.type}")
             }
         } catch (e: Exception) {
@@ -282,18 +288,171 @@ class DynamicResourceHandler(
     }
 
     /**
-     * Parse query parameters from a query string.
+     * Handle a statistics resource request.
+     *
+     * The URI query string encodes one or more entries of the form:
+     *   ?uuid=<uuid>&from=<unixTs>&to=<unixTs>[&uuid=<uuid>&from=<unixTs>&to=<unixTs>...]
+     *
+     * Multiple (uuid, from, to) triples are passed as repeated parameters:
+     *   loxone://statistics?uuid=aaa&from=1700000000&to=1700086400&uuid=bbb&from=1700000000&to=1700086400
+     *
+     * Optional per-request parameter (applies to all entries):
+     *   &unit=DAY   (ALL | HOUR | DAY | MONTH | YEAR, default DAY)
      */
-    private fun parseQueryParams(queryString: String): Map<String, String> =
+    private suspend fun handleStatistics(uri: String): ReadResourceResult {
+        val parseResult = parseStatisticsParams(uri)
+        if (parseResult is StatisticsParseResult.Error) return parseResult.result
+        val params = (parseResult as StatisticsParseResult.Ok).params
+
+        val app = adapter.getApp()
+        val buildResult = buildStatisticsResults(app, params.uuids, params.froms, params.tos, params.unit)
+        if (buildResult is StatisticsParseResult.Error) return buildResult.result
+
+        val content = json.encodeToString(JsonArray.serializer(), JsonArray((buildResult as StatisticsParseResult.Ok).results))
+        return successResult(uri, content, "application/json")
+    }
+
+    private fun parseStatisticsParams(uri: String): StatisticsParseResult {
+        val queryString = uri.substringAfter("?", "")
+        if (queryString.isBlank()) {
+            return StatisticsParseResult.Error(errorResult(uri, "No query parameters provided. Required: uuid, from, to"))
+        }
+        return validateStatisticsQueryParams(uri, parseQueryParamsList(queryString))
+    }
+
+    @Suppress("ReturnCount")
+    private fun validateStatisticsQueryParams(uri: String, params: Map<String, List<String>>): StatisticsParseResult {
+        val uuids = params["uuid"]
+            ?: return StatisticsParseResult.Error(errorResult(uri, "Missing required parameter: uuid"))
+        val froms = params["from"]
+            ?: return StatisticsParseResult.Error(errorResult(uri, "Missing required parameter: from"))
+        val tos = params["to"]
+            ?: return StatisticsParseResult.Error(errorResult(uri, "Missing required parameter: to"))
+
+        if (uuids.size != froms.size || uuids.size != tos.size) {
+            return StatisticsParseResult.Error(
+                errorResult(
+                    uri,
+                    "Mismatched parameter counts: uuid=${uuids.size}, from=${froms.size}, to=${tos.size}. " +
+                        "Each uuid must have a corresponding from and to."
+                )
+            )
+        }
+
+        val unitStr = params["unit"]?.firstOrNull()?.uppercase(Locale.ROOT)
+        val unit = unitStr?.let { name -> StatisticUnit.entries.firstOrNull { it.name == name } }
+        if (unitStr != null && unit == null) {
+            return StatisticsParseResult.Error(
+                errorResult(uri, "Unknown unit '$unitStr'. Valid values: ${StatisticUnit.entries.map { it.name }}")
+            )
+        }
+
+        return StatisticsParseResult.Ok(StatisticsParams(uuids, froms, tos, unit ?: StatisticUnit.DAY))
+    }
+
+    private suspend fun buildStatisticsResults(
+        app: LoxoneApp,
+        uuids: List<String>,
+        froms: List<String>,
+        tos: List<String>,
+        unit: StatisticUnit
+    ): StatisticsParseResult {
+        val results = mutableListOf<JsonElement>()
+        for (idx in uuids.indices) {
+            val uuid = uuids[idx]
+            val fromTs = runCatching { Instant.parse(froms[idx]) }.getOrNull()
+                ?: return StatisticsParseResult.Error(
+                    errorResult("", "Invalid 'from' value '${froms[idx]}' for uuid $uuid — expected ISO 8601 (e.g. 2024-11-15T00:00:00Z)")
+                )
+            val toTs = runCatching { Instant.parse(tos[idx]) }.getOrNull()
+                ?: return StatisticsParseResult.Error(
+                    errorResult("", "Invalid 'to' value '${tos[idx]}' for uuid $uuid — expected ISO 8601 (e.g. 2024-11-15T00:00:00Z)")
+                )
+            val control = app.controls[uuid]
+            results += if (control == null) {
+                buildJsonObject { put("uuid", uuid); put("error", "Control not found") }
+            } else {
+                buildStatisticResult(control, fromTs, toTs, unit)
+            }
+        }
+        return StatisticsParseResult.Ok(StatisticsParams(emptyList(), emptyList(), emptyList(), unit), results)
+    }
+
+    private suspend fun buildStatisticResult(
+        control: Control,
+        from: Instant,
+        until: Instant,
+        unit: StatisticUnit
+    ): JsonElement {
+        val uuid = control.uuidAction
+        val entries: List<StatisticEntry> = try {
+            adapter.fetchControlStatistics(uuid, from, until, unit) ?: emptyList()
+        } catch (e: Exception) {
+            logger.warn(e) { "Failed to fetch statistics for $uuid" }
+            return buildJsonObject {
+                put("uuid", uuid)
+                put("name", control.name)
+                put("error", "Failed to fetch statistics: ${e.message}")
+            }
+        }
+
+        // Determine value labels
+        val labels: List<String> = control.statistic?.outputs?.map { it.name }?.takeIf { it.isNotEmpty() }
+            ?: control.statisticV2?.groups?.firstOrNull()?.dataPoints?.map { it.title ?: it.output ?: "value" }
+            ?: emptyList()
+
+        val isV2 = control.statisticV2 != null
+
+        return buildJsonObject {
+            put("uuid", uuid)
+            put("name", control.name)
+            put("type", control.type)
+            put("statisticVersion", if (isV2) "v2" else "v1")
+            put("unit", unit.name)
+            put("entryCount", entries.size)
+            putJsonArray("labels") { labels.forEach { add(JsonPrimitive(it)) } }
+            putJsonArray("entries") {
+                entries.forEach { entry ->
+                    add(buildJsonObject {
+                        put("timestamp", entry.timestamp.toLong())
+                        putJsonArray("values") { entry.values.forEach { add(JsonPrimitive(it)) } }
+                    })
+                }
+            }
+        }
+    }
+
+    private data class StatisticsParams(
+        val uuids: List<String>,
+        val froms: List<String>,
+        val tos: List<String>,
+        val unit: StatisticUnit
+    )
+
+    private sealed interface StatisticsParseResult {
+        data class Ok(val params: StatisticsParams, val results: List<JsonElement> = emptyList()) : StatisticsParseResult
+        data class Error(val result: ReadResourceResult) : StatisticsParseResult
+    }
+
+    /**
+     * Parse query parameters from a query string, collecting all values per key (supports repeated keys).
+     */
+    internal fun parseQueryParamsList(queryString: String): Map<String, List<String>> =
         queryString.takeIf { it.isNotBlank() }
             ?.split("&")
-            ?.mapNotNull {
-                it.split("=", limit = 2).takeIf { p -> p.size == 2 && p[0].isNotBlank() }?.let { p ->
+            ?.mapNotNull { pair ->
+                pair.split("=", limit = 2).takeIf { p -> p.size == 2 && p[0].isNotBlank() }?.let { p ->
                     decode(p[0], "UTF-8") to decode(p[1], "UTF-8")
                 }
             }
-            ?.toMap()
+            ?.groupBy({ it.first }, { it.second })
             ?: emptyMap()
+
+    /**
+     * Parse query parameters from a query string (first value wins for duplicate keys).
+     */
+    private fun parseQueryParams(queryString: String): Map<String, String> =
+        parseQueryParamsList(queryString).mapValues { it.value.first() }
 
     private fun JsonObjectBuilder.putStateValue(name: String, value: Any) {
         when (value) {

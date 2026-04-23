@@ -11,6 +11,11 @@ import cz.smarteon.loxkt.LoxoneProfile
 import cz.smarteon.loxkt.state.LoxoneState
 import cz.smarteon.loxkt.LoxoneTokenAuthenticator
 import cz.smarteon.loxkt.app.Control
+import cz.smarteon.loxkt.app.StatisticEntry
+import cz.smarteon.loxkt.app.StatisticUnit
+import cz.smarteon.loxkt.app.fetchStatistics
+import kotlinx.datetime.Instant
+import kotlinx.datetime.TimeZone
 import cz.smarteon.loxkt.callForMsg
 import cz.smarteon.loxkt.ktor.KtorWebsocketLoxoneClient
 import cz.smarteon.loxkt.state.collectFrom
@@ -226,6 +231,28 @@ class LoxoneAdapter(
      */
     suspend fun getControlStates(control: Control): Map<String, Any> {
         return control.getAllValues(state)
+    }
+
+    /**
+     * Fetch statistics for a single control identified by [uuid].
+     *
+     * @param uuid UUID of the control (matches [Control.uuidAction])
+     * @param from Start of the time range (inclusive)
+     * @param until End of the time range (inclusive)
+     * @param unit Aggregation unit (default: [StatisticUnit.DAY])
+     * @param timeZone Time zone for V1 controls (default: UTC)
+     * @return List of [StatisticEntry] values, or null if the control was not found
+     */
+    suspend fun fetchControlStatistics(
+        uuid: String,
+        from: Instant,
+        until: Instant,
+        unit: StatisticUnit = StatisticUnit.DAY,
+        timeZone: TimeZone = TimeZone.UTC
+    ): List<StatisticEntry>? {
+        val app = getApp()
+        val control = app.controls[uuid] ?: return null
+        return control.fetchStatistics(getClient(), from, until, unit, timeZone)
     }
 
     /**
