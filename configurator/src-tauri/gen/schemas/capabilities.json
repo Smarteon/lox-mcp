@@ -1,1 +1,0 @@
-{"default":{"identifier":"default","description":"Default capability — grants frontend access to all app commands","local":true,"windows":["main"],"permissions":["core:default","shell:allow-open"]}}
