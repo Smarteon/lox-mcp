@@ -14,3 +14,11 @@ out/
 
 .env
 *.log
+
+# Configurator
+configurator/node_modules/
+configurator/dist/
+configurator/src-tauri/target/
+configurator/src-tauri/gen/
+.DS_Store
+src/.DS_Store

@@ -7,286 +7,92 @@ A [Model Context Protocol (MCP)](https://modelcontextprotocol.io/) server that c
 [![Kotlin](https://img.shields.io/badge/Kotlin-2.2.20-purple.svg)](https://kotlinlang.org/)
 [![MCP SDK](https://img.shields.io/badge/MCP_SDK-0.7.2-green.svg)](https://modelcontextprotocol.io/)
 
-## ✨ Features
+## What it does
 
-- 🔌 **Reliable Connection** - Connects to Loxone Miniserver via HTTP API and WebSocket
-- 📊 **Real-time State Reading** - Read device states via WebSocket event streaming
-- 🔐 **Flexible Credentials** - Multiple credential sources (env vars, CLI args, Bitwarden)
-- 📝 **Configuration-Driven** - Define tools and resources in YAML without code changes
-- 🎯 **Dynamic Registration** - Tools and resources automatically loaded from configuration
-- 🚀 **Dual Transport** - Support for both STDIO and HTTP/SSE modes
-- 📚 **Built-in Loxone Docs** - Versioned Structure File documentation served as browsable resources
-- 🧹 **Clean Architecture** - Type-safe Kotlin codebase with proper resource management
-- 📦 **Easy Integration** - Works with Claude Desktop, Cline, GitHub Copilot Chat, and more
+- Control Loxone devices (lights, blinds, scenes, …) from any MCP-capable AI assistant
+- Read real-time device states via WebSocket
+- Browse built-in Loxone structure file documentation
+- Works with Claude Desktop, Cursor, VS Code/Copilot, OpenCode, Zed, and more
 
-## 📋 Prerequisites
+## Prerequisites
 
-- **Java 21** or higher
+- **Java 21+**
 - **Loxone Miniserver** (Gen 1 or Gen 2)
-- AI assistant that supports MCP (e.g., Claude Desktop, Cline, GitHub Copilot Chat with MCP)
+- An AI assistant that supports MCP
 
-## 🚀 Quick Start
+## Quick Start
 
-### 1. Clone and Build
+### Option A — Configurator (recommended for non-technical users)
 
-```bash
-git clone https://github.com/smarteon/lox-mcp.git
-cd lox-mcp
-./gradlew build
-```
+Download the pre-built desktop app from the [Releases](https://github.com/Smarteon/lox-mcp/releases) page (`configurator-v*` tag). It will check Java, download the JAR, and configure your MCP clients automatically.
 
-### 2. Configure Credentials
+> **macOS:** The DMG is not code-signed. On first open, right-click the app → **Open**, then confirm. Or run `xattr -cr /Applications/Lox-MCP\ Configurator.app`.
 
-The server resolves credentials using a fixed priority: Bitwarden (if configured), then command-line arguments (if all are provided), and finally environment variables as a fallback:
+### Option B — Manual JAR
 
-#### Option A: Command-Line Arguments
+1. Download the latest `lox-mcp-*-all.jar` from [Releases](https://github.com/Smarteon/lox-mcp/releases).
+2. Set credentials as environment variables:
+   ```bash
+   export LOXONE_HOST=http://192.168.1.77
+   export LOXONE_USER=your_username
+   export LOXONE_PASS=your_password
+   ```
+3. Add to your MCP client config:
+   ```json
+   {
+     "mcpServers": {
+       "loxone": {
+         "command": "java",
+         "args": ["-jar", "/path/to/lox-mcp-all.jar", "--stdio", "--resources-as-tools"],
+         "env": {
+           "LOXONE_HOST": "http://192.168.1.77",
+           "LOXONE_USER": "your_username",
+           "LOXONE_PASS": "your_password"
+         }
+       }
+     }
+   }
+   ```
 
-```bash
-java -jar build/libs/lox-mcp-*.jar --stdio \
-  --address "http://192.168.1.77" \
-  --username "your_username" \
-  --password "your_password"
-```
+> Use `--resources-as-tools` if your client has limited resource support (recommended for most clients).
 
-#### Option B: Environment Variables (Recommended for Production)
+For HTTP/SSE transport, custom config files, Bitwarden credentials, and per-client setup details see [docs/SETUP.md](docs/SETUP.md).
 
-```bash
-# Linux/macOS
-export LOXONE_HOST=http://192.168.1.77
-export LOXONE_USER=your_username
-export LOXONE_PASS=your_password
-
-# Windows PowerShell
-$env:LOXONE_HOST="http://192.168.1.77"
-$env:LOXONE_USER="your_username"
-$env:LOXONE_PASS="your_password"
-```
-
-### 3. Run the Server
-
-**STDIO Mode (for Claude Desktop, Cline):**
-```bash
-./gradlew run --args="--stdio"
-```
-
-**HTTP/SSE Mode (for web clients):**
-```bash
-./gradlew run --args="--sse 3001"
-```
-
-### 4. Resources as Tools Mode (Recommended)
-
-Many MCP clients have limited or no support for MCP resources. Use the `--resources-as-tools` flag to expose all resources as callable tools instead:
-
-```bash
-# STDIO mode with resources as tools
-./gradlew run --args="--stdio --resources-as-tools"
-
-# HTTP/SSE mode with resources as tools  
-./gradlew run --args="--sse 3001 --resources-as-tools"
-```
-
-This converts resources like `loxone://rooms` into tools like `get_rooms_list`, making them accessible to any MCP client.
-
-## 🔌 Integration with AI Assistants
-
-### Claude Desktop
-
-Add to your Claude Desktop configuration (`claude_desktop_config.json`):
-
-```json
-{
-  "mcpServers": {
-    "loxone": {
-      "command": "java",
-      "args": [
-        "-jar",
-        "/path/to/lox-mcp/build/libs/lox-mcp-*.jar",
-        "--stdio",
-        "--resources-as-tools"
-      ],
-      "env": {
-        "LOXONE_HOST": "http://192.168.1.77",
-        "LOXONE_USER": "your_username",
-        "LOXONE_PASS": "your_password"
-      }
-    }
-  }
-}
-```
-
-> **Note:** The `--resources-as-tools` flag is recommended because Claude Desktop has limited support for MCP resources.
-
-### GitHub Copilot Chat (VS Code/JetBrains)
-
-Configure in your MCP settings using the same format as Claude Desktop.
-
-### Cline (VS Code Extension)
-
-Configure in Cline's MCP settings using the same format.
-
-## 📂 Project Structure
-
-```
-lox-mcp/
-├── src/main/kotlin/
-│   ├── Application.kt              # Entry point, command-line parsing
-│   ├── Constants.kt                # Application constants and handler type names
-│   ├── LoxoneAdapter.kt            # Wraps Loxone HTTP/WebSocket client
-│   ├── credentials/
-│   │   ├── CredentialSource.kt     # Credential source interface and implementations
-│   │   └── CredentialResolver.kt   # Resolves credentials from sources
-│   ├── config/
-│   │   ├── Models.kt               # Config data classes
-│   │   └── ConfigLoader.kt         # YAML config loading
-│   ├── loxonedocs/
-│   │   ├── LoxoneDocsProvider.kt   # Loads and serves versioned docs bundles
-│   │   └── Models.kt               # Docs data models (ControlDoc, DocSection, etc.)
-│   └── server/
-│       ├── McpServer.kt            # MCP server setup (STDIO & HTTP/SSE)
-│       ├── ToolsRegistry.kt        # Registers tools from config
-│       ├── ResourcesRegistry.kt    # Registers resources from config
-│       ├── DynamicToolHandler.kt   # Executes tool logic
-│       └── DynamicResourceHandler.kt # Provides resource content
-├── src/main/resources/
-│   └── mcp-config.yaml             # Tools and resources configuration
-├── loxone-docs/
-│   ├── versions.json               # Index of available parsed docs versions
-│   └── structure-file-{ver}.json   # Pre-parsed Structure File docs (CI-generated)
-├── .github/
-│   ├── scripts/parse-loxone-docs.py  # Python script that parses the Loxone PDF
-│   └── workflows/update-loxone-docs.yml # Weekly CI job to refresh docs
-├── build.gradle.kts                # Gradle build configuration
-├── gradle/libs.versions.toml       # Dependency versions
-└── README.md                       # This file
-```
-
-### Available Tools
-
-The server exposes these MCP tools for controlling Loxone devices:
+## Available Tools
 
 | Tool | Description |
 |------|-------------|
-| `control_device` | Control a specific device by UUID (on, off, toggle, up, down, stop) |
-| `control_devices_by_room` | Control all devices in a room (with optional type filter and state reading) |
+| `control_device` | Control a device by UUID (on, off, toggle, up, down, stop) |
+| `control_devices_by_room` | Control all devices in a room (optional type filter) |
 | `control_devices_by_type` | Control all devices of a specific type system-wide |
 | `control_devices_by_category` | Control all devices in a category |
-| `send_command` | Send raw commands for advanced control |
+| `send_command` | Send a raw Loxone command |
 
-### Available Resources
+## Available Resources
 
-Resources provide read-only access to Loxone system data and documentation:
-
-| Resource URI | Description |
-|--------------|-------------|
+| URI | Description |
+|-----|-------------|
 | `loxone://structure/summary` | Overview of rooms, devices, and categories |
-| `loxone://rooms` | List of all rooms with device counts |
+| `loxone://rooms` | All rooms with device counts |
 | `loxone://rooms/{roomName}/devices` | Devices in a specific room |
-| `loxone://devices/all` | Complete list of all devices |
-| `loxone://devices/type/{type}` | Devices filtered by type (e.g., Switch, Dimmer) |
-| `loxone://devices/category/{name}` | Devices filtered by category |
-| `loxone://categories` | List of all categories |
-| `loxone://devices/states` | Real-time state values for all devices |
-| `loxone://devices/{uuid}/state` | State values for a specific device |
-| `loxone://docs` | **Loxone docs TOC** — browse all documented sections and controls |
-| `loxone://docs/controls` | **Flat list of all control types** with detail links |
-| `loxone://docs/topic/{name}` | **Full docs for a control or general section** (e.g. `Switch`, `rooms`) |
+| `loxone://devices/all` | All devices |
+| `loxone://devices/type/{type}` | Devices by type (Switch, Dimmer, …) |
+| `loxone://devices/category/{name}` | Devices by category |
+| `loxone://devices/states` | Real-time state of all devices |
+| `loxone://devices/{uuid}/state` | State of a specific device |
+| `loxone://docs` | Loxone docs table of contents |
+| `loxone://docs/controls` | All documented control types |
+| `loxone://docs/topic/{name}` | Full docs for a control or section |
 
-### Custom Configuration Files
+## License
 
-You can load custom configuration files using the `-c` or `--config` parameter. By default, custom configurations are **merged** with the internal configuration, allowing you to add or override specific tools and resources.
+Dual-licensed under **AGPL-3.0** (open source) and a **commercial license** for proprietary use.
 
-#### Merge Mode (Default)
+- Free for personal, internal, and open-source use under AGPL-3.0 terms.
+- For closed-source or SaaS products, contact **info@smarteon.cz** or see [COMMERCIAL_LICENSE](COMMERCIAL_LICENSE).
 
-```bash
-# Custom tools/resources are added to internal ones
-./gradlew run --args="--stdio -c /path/to/custom-config.yaml"
-```
+## Related Projects
 
-#### Override Mode
-
-```bash
-# Only use custom configuration, ignore internal config
-./gradlew run --args="--stdio -c /path/to/custom-config.yaml -o"
-```
-
-### Tools and Resources
-
-Define tools and resources in `src/main/resources/mcp-config.yaml`:
-
-```yaml
-tools:
-  - name: control_device
-    description: Control a Loxone device
-    parameters:
-      - name: device_id
-        type: string
-        required: true
-      - name: action
-        type: string
-        required: true
-    handler:
-      type: control_device
-
-resources:
-  - uri: loxone://rooms
-    name: All Rooms
-    description: List of all rooms
-    mimeType: application/json
-    handler:
-      type: rooms_list
-```
-
-See `docs/DEVELOPER_GUIDE.md` for detailed documentation.
-
-## 🧪 Development
-
-```bash
-# Full build
-./gradlew build
-
-# Run tests
-./gradlew test
-
-# Run in STDIO mode
-./gradlew run --args="--stdio"
-
-# Run in HTTP/SSE mode
-./gradlew run --args="--sse 3001"
-
-# Build distribution
-./gradlew installDist
-```
-
-## 📄 License
-
-This project uses a **dual licensing** model:
-
-### Open Source (Free)
-Use under the **AGPL-3.0** license for:
-- Personal use
-- Internal use
-- Open source projects
-- Commercial use, provided you comply with the AGPL-3.0 terms
-
-If you modify the software and distribute it, or offer it for use over a network, you must comply with the AGPL-3.0 requirements, including providing corresponding source code when applicable.
-
-See the [LICENSE](LICENSE) file for full AGPL-3.0 license text.
-
-### Commercial License
-If you want to use, modify, distribute, or offer this software as part of a proprietary or closed-source product/service without complying with the AGPL-3.0 obligations, you can obtain a **commercial license**. Contact:
-
-**info@smarteon.cz**
-
-Typical cases for a commercial license include:
-- Closed-source / proprietary products
-- SaaS or web services where you do not want to provide source code under AGPL-3.0
-- Commercial offerings where you want to keep modifications proprietary
-
-See [COMMERCIAL_LICENSE](COMMERCIAL_LICENSE) for details.
-
-## 🔗 Related Projects
-
-- [loxone-client-kotlin](https://github.com/Smarteon/loxone-client-kotlin) - Kotlin client library for Loxone Miniserver
-- [Model Context Protocol](https://modelcontextprotocol.io/) - Protocol specification
-- [MCP Kotlin SDK](https://github.com/modelcontextprotocol/kotlin-sdk) - Kotlin SDK for MCP
+- [loxone-client-kotlin](https://github.com/Smarteon/loxone-client-kotlin) — Kotlin client library for Loxone Miniserver
+- [Model Context Protocol](https://modelcontextprotocol.io/) — Protocol specification
+- [MCP Kotlin SDK](https://github.com/modelcontextprotocol/kotlin-sdk) — Kotlin SDK for MCP
