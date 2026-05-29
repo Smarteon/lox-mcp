@@ -17,6 +17,47 @@ pub struct ReleaseInfo {
     pub checksum_url: Option<String>,
 }
 
+#[derive(Deserialize)]
+struct GithubAsset {
+    name: String,
+    browser_download_url: String,
+}
+
+#[derive(Deserialize)]
+struct GithubRelease {
+    tag_name: String,
+    draft: bool,
+    prerelease: bool,
+    assets: Vec<GithubAsset>,
+}
+
+fn extract_release_info(release: &GithubRelease) -> Option<ReleaseInfo> {
+    let download_url = release
+        .assets
+        .iter()
+        .find(|asset| asset.name.ends_with("-all.jar"))
+        .map(|asset| asset.browser_download_url.clone())?;
+
+    let checksum_url = release
+        .assets
+        .iter()
+        .find(|asset| asset.name.ends_with("-all.jar.sha256"))
+        .map(|asset| asset.browser_download_url.clone());
+
+    Some(ReleaseInfo {
+        version: release.tag_name.trim_start_matches('v').to_string(),
+        download_url,
+        checksum_url,
+    })
+}
+
+fn select_latest_mcp_release(releases: &[GithubRelease]) -> Option<ReleaseInfo> {
+    releases
+        .iter()
+        .filter(|release| !release.draft && !release.prerelease)
+        .find_map(extract_release_info)
+}
+
 fn get_jar_dir() -> PathBuf {
     dirs::home_dir().unwrap_or_default().join(".lox-mcp")
 }
@@ -58,8 +99,8 @@ pub async fn get_latest_release() -> Result<ReleaseInfo, String> {
         .build()
         .map_err(|e| e.to_string())?;
 
-    let resp: serde_json::Value = client
-        .get("https://api.github.com/repos/Smarteon/lox-mcp/releases/latest")
+    let resp: Vec<GithubRelease> = client
+        .get("https://api.github.com/repos/Smarteon/lox-mcp/releases")
         .send()
         .await
         .map_err(|e| e.to_string())?
@@ -67,43 +108,8 @@ pub async fn get_latest_release() -> Result<ReleaseInfo, String> {
         .await
         .map_err(|e| e.to_string())?;
 
-    let tag = resp["tag_name"]
-        .as_str()
-        .unwrap_or("unknown")
-        .trim_start_matches('v')
-        .to_string();
-
-    let download_url = resp["assets"]
-        .as_array()
-        .and_then(|assets| {
-            assets.iter().find(|a| {
-                a["name"]
-                    .as_str()
-                    .map_or(false, |n| n.ends_with("-all.jar"))
-            })
-        })
-        .and_then(|a| a["browser_download_url"].as_str())
-        .unwrap_or("")
-        .to_string();
-
-    // Optional: companion SHA256 checksum file (e.g. lox-mcp-1.2.3-all.jar.sha256)
-    let checksum_url = resp["assets"]
-        .as_array()
-        .and_then(|assets| {
-            assets.iter().find(|a| {
-                a["name"]
-                    .as_str()
-                    .map_or(false, |n| n.ends_with("-all.jar.sha256"))
-            })
-        })
-        .and_then(|a| a["browser_download_url"].as_str())
-        .map(|s| s.to_string());
-
-    Ok(ReleaseInfo {
-        version: tag,
-        download_url,
-        checksum_url,
-    })
+    select_latest_mcp_release(&resp)
+        .ok_or_else(|| "No stable MCP release with a -all.jar asset found".to_string())
 }
 
 #[tauri::command]
@@ -182,4 +188,61 @@ pub async fn download_jar(url: String, checksum_url: Option<String>) -> Result<S
     fs::write(get_version_path(), &version).map_err(|e| e.to_string())?;
 
     Ok(dest.to_string_lossy().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{select_latest_mcp_release, GithubAsset, GithubRelease};
+
+    fn asset(name: &str) -> GithubAsset {
+        GithubAsset {
+            name: name.to_string(),
+            browser_download_url: format!("https://example.com/{name}"),
+        }
+    }
+
+    #[test]
+    fn selects_first_stable_release_with_mcp_jar_asset() {
+        let releases = vec![
+            GithubRelease {
+                tag_name: "configurator-v1.2.3".to_string(),
+                draft: false,
+                prerelease: false,
+                assets: vec![asset("configurator-macos.dmg")],
+            },
+            GithubRelease {
+                tag_name: "v1.2.2".to_string(),
+                draft: false,
+                prerelease: false,
+                assets: vec![
+                    asset("lox-mcp-1.2.2-all.jar"),
+                    asset("lox-mcp-1.2.2-all.jar.sha256"),
+                ],
+            },
+        ];
+
+        let selected = select_latest_mcp_release(&releases).expect("release should be selected");
+
+        assert_eq!(selected.version, "1.2.2");
+        assert_eq!(
+            selected.download_url,
+            "https://example.com/lox-mcp-1.2.2-all.jar"
+        );
+        assert_eq!(
+            selected.checksum_url,
+            Some("https://example.com/lox-mcp-1.2.2-all.jar.sha256".to_string())
+        );
+    }
+
+    #[test]
+    fn returns_none_when_no_release_contains_mcp_jar_asset() {
+        let releases = vec![GithubRelease {
+            tag_name: "configurator-v1.2.3".to_string(),
+            draft: false,
+            prerelease: false,
+            assets: vec![asset("configurator-macos.dmg")],
+        }];
+
+        assert!(select_latest_mcp_release(&releases).is_none());
+    }
 }
