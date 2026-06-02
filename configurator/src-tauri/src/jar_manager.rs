@@ -51,10 +51,15 @@ fn extract_release_info(release: &GithubRelease) -> Option<ReleaseInfo> {
     })
 }
 
+fn is_mcp_release_tag(tag: &str) -> bool {
+    tag.starts_with('v')
+}
+
 fn select_latest_mcp_release(releases: &[GithubRelease]) -> Option<ReleaseInfo> {
     releases
         .iter()
         .filter(|release| !release.draft && !release.prerelease)
+        .filter(|release| is_mcp_release_tag(&release.tag_name))
         .find_map(extract_release_info)
 }
 
@@ -244,5 +249,30 @@ mod tests {
         }];
 
         assert!(select_latest_mcp_release(&releases).is_none());
+    }
+
+    #[test]
+    fn ignores_configurator_tag_even_with_mcp_like_asset_name() {
+        let releases = vec![
+            GithubRelease {
+                tag_name: "configurator-v1.2.3".to_string(),
+                draft: false,
+                prerelease: false,
+                assets: vec![asset("lox-mcp-1.2.3-all.jar")],
+            },
+            GithubRelease {
+                tag_name: "v1.2.2".to_string(),
+                draft: false,
+                prerelease: false,
+                assets: vec![asset("lox-mcp-1.2.2-all.jar")],
+            },
+        ];
+
+        let selected = select_latest_mcp_release(&releases).expect("release should be selected");
+        assert_eq!(selected.version, "1.2.2");
+        assert_eq!(
+            selected.download_url,
+            "https://example.com/lox-mcp-1.2.2-all.jar"
+        );
     }
 }
