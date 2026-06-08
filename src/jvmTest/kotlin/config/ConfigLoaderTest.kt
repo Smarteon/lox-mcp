@@ -1,12 +1,12 @@
 package cz.smarteon.loxmcp.config
 
-import com.charleskorn.kaml.Yaml
 import io.kotest.assertions.throwables.shouldNotThrowAny
 import io.kotest.core.spec.style.ShouldSpec
 import io.kotest.matchers.collections.shouldHaveSize
 import io.kotest.matchers.shouldBe
 import io.kotest.matchers.shouldNotBe
 import java.nio.file.Files
+import com.charleskorn.kaml.Yaml
 
 class ConfigLoaderTest : ShouldSpec({
 
@@ -92,7 +92,7 @@ class ConfigLoaderTest : ShouldSpec({
                     handler:
                       type: generic_command
                 resources:
-                  - uri: loxone://custom
+                  - uri: custom
                     name: Custom Resource
                     description: Custom resource
                     mimeType: application/json
@@ -127,7 +127,7 @@ class ConfigLoaderTest : ShouldSpec({
                     handler:
                       type: send_control_command
                 resources:
-                  - uri: loxone://custom_only
+                  - uri: custom_only
                     name: Only Custom Resource
                     description: Only custom resource
                     mimeType: application/json
@@ -144,7 +144,7 @@ class ConfigLoaderTest : ShouldSpec({
                 config.resources shouldHaveSize 1
 
                 config.tools[0].name shouldBe "custom_tool_only"
-                config.resources[0].uri shouldBe "loxone://custom_only"
+                config.resources[0].uri shouldBe "custom_only"
             } finally {
                 tempFile.delete()
             }
@@ -184,7 +184,7 @@ class ConfigLoaderTest : ShouldSpec({
                 """
                 tools: []
                 resources:
-                  - uri: loxone://rooms
+                  - uri: "loxone://rooms"
                     name: Custom Rooms List
                     description: Overridden rooms list
                     mimeType: text/plain
@@ -245,7 +245,7 @@ class ConfigLoaderTest : ShouldSpec({
             val yaml = """
                 tools: []
                 resources:
-                  - uri: loxone://rooms
+                  - uri: rooms
                     name: All Rooms
                     description: List all rooms
                     mimeType: application/json
@@ -256,7 +256,7 @@ class ConfigLoaderTest : ShouldSpec({
             val config = Yaml.default.decodeFromString(McpConfig.serializer(), yaml)
 
             config.resources shouldHaveSize 1
-            config.resources[0].uri shouldBe "loxone://rooms"
+            config.resources[0].uri shouldBe "rooms"
             config.resources[0].name shouldBe "All Rooms"
             config.resources[0].mimeType shouldBe "application/json"
             config.resources[0].handler.type shouldBe "rooms_list"
