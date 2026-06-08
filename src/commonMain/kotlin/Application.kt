@@ -9,8 +9,8 @@ import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.serialization.kotlinx.json.json
 import io.ktor.server.application.Application
 import io.ktor.server.application.install
+import io.ktor.server.cio.CIO
 import io.ktor.server.engine.embeddedServer
-import io.ktor.server.netty.Netty
 import io.ktor.server.plugins.contentnegotiation.ContentNegotiation
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -115,7 +115,7 @@ private fun runHttpMode(args: Array<String>) {
     logger.info { "Starting Loxone MCP Server in HTTP/SSE mode" }
 
     embeddedServer(
-        factory = Netty,
+        factory = CIO,
         port = McpServerProperties.port,
         host = "0.0.0.0",
         module = { module(args) }
@@ -169,15 +169,13 @@ private fun initAdapter(args: Array<String>, scope: CoroutineScope): LoxoneAdapt
  * Registers a shutdown hook to gracefully close the Loxone adapter connection and cancel the scope.
  */
 private fun registerShutdownHook(adapter: LoxoneAdapter, scope: CoroutineScope) {
-    Runtime.getRuntime().addShutdownHook(Thread {
-        runBlocking {
-            runCatching {
-                adapter.close()
-                scope.cancel()
-                logger.info { "Loxone connection closed successfully" }
-            }.onFailure { e ->
-                logger.error(e) { "Error during shutdown" }
-            }
+    registerShutdownCallback {
+        runCatching {
+            adapter.close()
+            scope.cancel()
+            logger.info { "Loxone connection closed successfully" }
+        }.onFailure { e ->
+            logger.error(e) { "Error during shutdown" }
         }
-    })
+    }
 }

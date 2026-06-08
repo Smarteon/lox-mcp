@@ -216,7 +216,7 @@ class DynamicToolHandler(
 
             val value = when {
                 argValue != null -> argValue
-                paramConfig?.default != null -> paramConfig.default!!
+                paramConfig?.default != null -> paramConfig.default
                 paramConfig?.required == true -> throw IllegalArgumentException(
                     "Missing required parameter '$placeholder' for command template"
                 )

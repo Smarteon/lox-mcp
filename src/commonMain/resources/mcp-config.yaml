@@ -1,0 +1,190 @@
+tools:
+  - name: control_device
+    description: Control a specific Loxone device by its UUID
+    parameters:
+      - name: device_id
+        type: string
+        description: The UUID of the device to control
+        required: true
+      - name: action
+        type: string
+        description: Action to perform
+        required: true
+        enum: ["on", "off", "toggle", "up", "down", "stop"]
+      - name: value
+        type: number
+        description: Optional value for the action
+        required: false
+    handler:
+      type: control_device
+
+  - name: control_devices_by_room
+    description: Control all devices of a specific type in a room
+    parameters:
+      - name: room
+        type: string
+        description: Name of the room
+        required: true
+      - name: action
+        type: string
+        description: Action to perform on all devices
+        required: true
+        enum: ["on", "off", "up", "down", "stop"]
+      - name: device_type
+        type: string
+        description: Optional device type filter
+        required: false
+      - name: include_states
+        type: boolean
+        description: Include current state values
+        required: false
+        default: false
+    handler:
+      type: control_devices_by_room
+
+  - name: control_devices_by_type
+    description: Control all devices of a specific type
+    parameters:
+      - name: device_type
+        type: string
+        description: Type of devices to control
+        required: true
+      - name: action
+        type: string
+        description: Action to perform
+        required: true
+        enum: ["on", "off", "up", "down", "stop"]
+      - name: include_states
+        type: boolean
+        description: Include current state values
+        required: false
+        default: false
+    handler:
+      type: control_devices_by_type
+
+  - name: control_devices_by_category
+    description: Control all devices in a specific category
+    parameters:
+      - name: category
+        type: string
+        description: Category name
+        required: true
+      - name: action
+        type: string
+        description: Action to perform
+        required: true
+        enum: ["on", "off", "up", "down", "stop"]
+      - name: include_states
+        type: boolean
+        description: Include current state values
+        required: false
+        default: false
+    handler:
+      type: control_devices_by_category
+
+  - name: send_control_command
+    description: Send a command to a device by UUID
+    parameters:
+      - name: control
+        type: string
+        description: The UUID of the control to target
+        required: true
+      - name: action
+        type: string
+        description: The action or command to send
+        required: true
+    handler:
+      type: generic_command
+      commandTemplate: "/jdev/sps/io/{control}/{action}"
+
+resources:
+  - uri: "loxone://structure/summary"
+    name: Loxone Structure Summary
+    description: Overview of the entire Loxone system structure
+    mimeType: application/json
+    handler:
+      type: structure_summary
+
+  - uri: "loxone://rooms"
+    name: All Rooms
+    description: List of all rooms in the Loxone system
+    mimeType: application/json
+    handler:
+      type: rooms_list
+
+  - uri: "loxone://rooms/{roomName}/devices"
+    name: Room Devices
+    description: List all devices in a specific room
+    mimeType: application/json
+    handler:
+      type: room_devices
+
+  - uri: "loxone://devices/all"
+    name: All Devices
+    description: Complete list of all devices in the system
+    mimeType: application/json
+    handler:
+      type: devices_all
+
+  - uri: "loxone://devices/type/{deviceType}"
+    name: Devices by Type
+    description: List all devices of a specific type
+    mimeType: application/json
+    handler:
+      type: devices_by_type
+
+  - uri: "loxone://devices/category/{categoryName}"
+    name: Devices by Category
+    description: List all devices in a specific category
+    mimeType: application/json
+    handler:
+      type: devices_by_category
+
+  - uri: "loxone://categories"
+    name: All Categories
+    description: List of all categories in the Loxone system
+    mimeType: application/json
+    handler:
+      type: categories_list
+
+  - uri: "loxone://docs"
+    name: Loxone Docs TOC
+    description: Table of Contents for the Loxone Structure File documentation
+    mimeType: application/json
+    handler:
+      type: docs_toc
+
+  - uri: "loxone://docs/controls"
+    name: Loxone Docs Controls
+    description: Flat list of every control type documented
+    mimeType: application/json
+    handler:
+      type: docs_controls
+
+  - uri: "loxone://docs/topic/{name}"
+    name: Loxone Docs Topic
+    description: Full documentation for a named topic
+    mimeType: application/json
+    handler:
+      type: docs_topic
+
+  - uri: "loxone://devices/states"
+    name: All Device States
+    description: Get current state values for all devices
+    mimeType: application/json
+    handler:
+      type: all_device_states
+
+  - uri: "loxone://devices/{deviceUuid}/state"
+    name: Device State
+    description: Get current state values for a specific device
+    mimeType: application/json
+    handler:
+      type: device_state
+
+  - uri: "loxone://statistics"
+    name: Device Statistics
+    description: Fetch historical statistics for one or more Loxone controls
+    mimeType: application/json
+    handler:
+      type: statistics

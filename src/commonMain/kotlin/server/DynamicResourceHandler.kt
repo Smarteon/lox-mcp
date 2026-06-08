@@ -20,6 +20,7 @@ import cz.smarteon.loxmcp.server.LoxoneQueryHelper.getVisibleControlsForCategory
 import cz.smarteon.loxmcp.server.LoxoneQueryHelper.getVisibleControlsForRoom
 import cz.smarteon.loxmcp.loxonedocs.LoxoneDocsProvider
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.http.decodeURLPart
 import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
 import kotlinx.datetime.Instant
@@ -33,8 +34,6 @@ import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
 import kotlinx.serialization.json.putJsonObject
-import java.net.URLDecoder.decode
-import java.util.Locale
 
 private val logger = KotlinLogging.logger {}
 
@@ -339,7 +338,7 @@ class DynamicResourceHandler(
             )
         }
 
-        val unitStr = params["unit"]?.firstOrNull()?.uppercase(Locale.ROOT)
+        val unitStr = params["unit"]?.firstOrNull()?.uppercase()
         val unit = unitStr?.let { name -> StatisticUnit.entries.firstOrNull { it.name == name } }
         if (unitStr != null && unit == null) {
             return StatisticsParseResult.Error(
@@ -442,7 +441,7 @@ class DynamicResourceHandler(
             ?.split("&")
             ?.mapNotNull { pair ->
                 pair.split("=", limit = 2).takeIf { p -> p.size == 2 && p[0].isNotBlank() }?.let { p ->
-                    decode(p[0], "UTF-8") to decode(p[1], "UTF-8")
+                    p[0].decodeURLPart() to p[1].decodeURLPart()
                 }
             }
             ?.groupBy({ it.first }, { it.second })

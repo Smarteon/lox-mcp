@@ -6,8 +6,7 @@ import cz.smarteon.loxmcp.LoxoneXmlProcessor
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.modelcontextprotocol.kotlin.sdk.types.CallToolResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextContent
-import java.io.ByteArrayInputStream
-import java.util.zip.ZipInputStream
+import no.synth.kmpzip.zip.ZipInputStream
 
 private val logger = KotlinLogging.logger {}
 
@@ -34,7 +33,7 @@ internal class GetLoxoneXmlHandler(private val adapter: LoxoneAdapter) {
 
             val xmlFiles: Map<String, String> = if (isZip(rawBytes)) {
                 logger.debug { "Detected ZIP — multi-Miniserver chain" }
-                extractLoxCCsFromZip(rawBytes)
+                extractLoxCCsFromZip(rawBytes, LOXCC_EXTENSION)
                     .mapKeys { (name, _) -> name.replace(LOXCC_SUFFIX_REGEX, LOXONE_EXTENSION) }
                     .mapValues { (_, data) -> processLoxCC(data) }
             } else {
@@ -63,10 +62,8 @@ internal class GetLoxoneXmlHandler(private val adapter: LoxoneAdapter) {
         }
     }
 
-    // ── private helpers ──────────────────────────────────────────────────────
-
     private fun processLoxCC(data: ByteArray): String {
-        var xml = LoxCC.decompress(data).toString(Charsets.UTF_8)
+        var xml = LoxCC.decompress(data).decodeToString()
         xml = LoxoneXmlProcessor.sanitize(xml)
         return LoxoneXmlProcessor.slim(xml)
     }
@@ -79,19 +76,17 @@ internal class GetLoxoneXmlHandler(private val adapter: LoxoneAdapter) {
             data[2] == 0x03.toByte() &&
             data[3] == 0x04.toByte()
 
-    private fun extractLoxCCsFromZip(data: ByteArray): Map<String, ByteArray> {
+    private fun extractLoxCCsFromZip(data: ByteArray, extension: String): Map<String, ByteArray> {
         val result = mutableMapOf<String, ByteArray>()
-        ZipInputStream(ByteArrayInputStream(data)).use { zis ->
-            var entry = zis.nextEntry
-            while (entry != null) {
-                if (entry.name.endsWith(LOXCC_EXTENSION, ignoreCase = true)) {
+        ZipInputStream(data).use { zis ->
+            while (true) {
+                val entry = zis.nextEntry ?: break
+                if (entry.name.endsWith(extension, ignoreCase = true)) {
                     result[entry.name] = zis.readBytes()
                 }
-                zis.closeEntry()
-                entry = zis.nextEntry
             }
         }
-        if (result.isEmpty()) throw LoxCC.DecompressException("No .LoxCC files found in ZIP")
+        if (result.isEmpty()) throw LoxCC.DecompressException("No $extension files found in ZIP")
         return result
     }
 }
