@@ -4,19 +4,7 @@ package cz.smarteon.loxmcp
  * Application-wide constants.
  */
 object Constants {
-    /**
-     * The version of the Loxone MCP Server.
-     * Automatically loaded from the build-generated version file.
-     */
-    val VERSION: String by lazy {
-        Constants::class.java.classLoader
-            .getResourceAsStream(VERSION_FILE_NAME)
-            ?.bufferedReader()
-            ?.use { it.readText().trim() }
-            ?: "unknown"
-    }
-
-    const val VERSION_FILE_NAME = "version.txt"
+    val VERSION: String = SERVER_VERSION
 
     /**
      * The name of the MCP server implementation.

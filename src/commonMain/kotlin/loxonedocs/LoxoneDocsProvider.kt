@@ -1,8 +1,19 @@
 package cz.smarteon.loxmcp.loxonedocs
 
+import cz.smarteon.loxmcp.readResourceBytes
 import io.github.oshai.kotlinlogging.KotlinLogging
+import io.ktor.client.HttpClient
+import io.ktor.client.plugins.HttpTimeout
+import io.ktor.client.request.get
+import io.ktor.client.statement.bodyAsText
+import io.ktor.http.decodeURLPart
+import io.ktor.http.encodeURLPathPart
+import io.ktor.http.isSuccess
 import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.runBlocking
+import kotlinx.coroutines.withTimeout
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonObject
@@ -10,13 +21,6 @@ import kotlinx.serialization.json.buildJsonArray
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
-import java.net.URI
-import java.net.URLDecoder
-import java.net.URLEncoder
-import java.net.http.HttpClient
-import java.net.http.HttpRequest
-import java.net.http.HttpResponse
-import java.time.Duration
 
 private val logger = KotlinLogging.logger {}
 
@@ -142,10 +146,9 @@ object LoxoneDocsProvider {
 
     private fun loadVersionsFromClasspath(): List<DocsVersion> {
         return try {
-            val stream = LoxoneDocsProvider::class.java.getResourceAsStream("$CLASSPATH_PREFIX/$VERSIONS_INDEX_FILE")
-            if (stream != null) {
-                val content = stream.bufferedReader().use { it.readText() }
-                parseVersionsIndex(content)
+            val bytes = readResourceBytes("$CLASSPATH_PREFIX/$VERSIONS_INDEX_FILE")
+            if (bytes != null) {
+                parseVersionsIndex(bytes.decodeToString())
             } else {
                 emptyList()
             }
@@ -182,9 +185,9 @@ object LoxoneDocsProvider {
         val fileName = "structure-file-$version.json"
 
         try {
-            val stream = LoxoneDocsProvider::class.java.getResourceAsStream("$CLASSPATH_PREFIX/$fileName")
-            if (stream != null) {
-                val content = stream.bufferedReader().use { it.readText() }
+            val bytes = readResourceBytes("$CLASSPATH_PREFIX/$fileName")
+            if (bytes != null) {
+                val content = bytes.decodeToString()
                 val file = json.decodeFromString<ParsedStructureFile>(content)
                 logger.info {
                     "Loaded docs v${file.version} from classpath " +
@@ -214,17 +217,27 @@ object LoxoneDocsProvider {
         return null
     }
 
+    private val httpClient by lazy {
+        HttpClient {
+            install(HttpTimeout) {
+                requestTimeoutMillis = DOWNLOAD_TIMEOUT_SECONDS * 1_000
+                connectTimeoutMillis = DOWNLOAD_TIMEOUT_SECONDS * 1_000
+            }
+        }
+    }
+
     private fun downloadFromUrl(url: String): String? {
-        val client = HttpClient.newBuilder()
-            .connectTimeout(Duration.ofSeconds(DOWNLOAD_TIMEOUT_SECONDS))
-            .build()
-        val request = HttpRequest.newBuilder()
-            .uri(URI.create(url))
-            .timeout(Duration.ofSeconds(DOWNLOAD_TIMEOUT_SECONDS))
-            .GET()
-            .build()
-        val response = client.send(request, HttpResponse.BodyHandlers.ofString())
-        return if (response.statusCode() == 200) response.body() else null
+        return try {
+            runBlocking(Dispatchers.Default) {
+                withTimeout(DOWNLOAD_TIMEOUT_SECONDS * 1_000) {
+                    val response = httpClient.get(url)
+                    if (response.status.isSuccess()) response.bodyAsText() else null
+                }
+            }
+        } catch (e: Exception) {
+            logger.debug(e) { "Failed to download from $url" }
+            null
+        }
     }
 
     /**
@@ -245,7 +258,7 @@ object LoxoneDocsProvider {
                 put("name", section.name)
                 if (section.description.isNotBlank()) put("description", section.description)
                 put("type", "generalSection")
-                put("detailUri", "loxone://docs/topic/${URLEncoder.encode(section.name, "UTF-8")}")
+                put("detailUri", "loxone://docs/topic/${section.name.encodeURLPathPart()}")
                 if (section.subsections.isNotEmpty()) {
                     putJsonArray("subsections") { section.subsections.forEach { add(sectionEntry(it)) } }
                 }
@@ -256,7 +269,7 @@ object LoxoneDocsProvider {
                 put("name", control.name)
                 if (control.description.isNotBlank()) put("description", control.description)
                 put("type", "control")
-                put("detailUri", "loxone://docs/topic/${URLEncoder.encode(control.name, "UTF-8")}")
+                put("detailUri", "loxone://docs/topic/${control.name.encodeURLPathPart()}")
                 put("detailsCount", control.details.size)
                 put("statesCount", control.states.size)
                 put("commandsCount", control.commands.size)
@@ -298,7 +311,7 @@ object LoxoneDocsProvider {
                     put("detailsCount", control.details.size)
                     put("statesCount", control.states.size)
                     put("commandsCount", control.commands.size)
-                    put("detailUri", "loxone://docs/topic/${URLEncoder.encode(control.name, "UTF-8")}")
+                put("detailUri", "loxone://docs/topic/${control.name.encodeURLPathPart()}")
                 })
             }
         }
@@ -311,7 +324,7 @@ object LoxoneDocsProvider {
      * Tries controls first (case-insensitive), then general sections.
      */
     fun handleDocsTopic(uri: String, miniserverVersion: String? = null): ReadResourceResult {
-        val topicName = URLDecoder.decode(uri.substringAfter("docs/topic/").trim(), "UTF-8")
+        val topicName = uri.substringAfter("docs/topic/").trim().decodeURLPart()
         if (topicName.isBlank()) {
             return errorResult(uri, "Topic name not found in URI")
         }

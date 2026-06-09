@@ -1,5 +1,6 @@
 package cz.smarteon.loxmcp.credentials
 
+import cz.smarteon.loxmcp.getEnv
 import io.github.oshai.kotlinlogging.KotlinLogging
 
 private val logger = KotlinLogging.logger {}
@@ -51,7 +52,7 @@ class EnvCredentialSource : CredentialSource {
     }
 
     private fun getRequiredEnv(name: String): String =
-        System.getenv(name) ?: error("Environment variable $name is required")
+        getEnv(name) ?: error("Environment variable $name is required")
 
     companion object {
         const val ENV_HOST = "LOXONE_HOST"

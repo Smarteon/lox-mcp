@@ -2,6 +2,8 @@ package cz.smarteon.loxmcp.server
 
 import cz.smarteon.loxmcp.Constants
 import cz.smarteon.loxmcp.LoxoneAdapter
+import cz.smarteon.loxmcp.platformStdinSource
+import cz.smarteon.loxmcp.platformStdoutSink
 import cz.smarteon.loxmcp.config.McpServerProperties
 import io.github.oshai.kotlinlogging.KotlinLogging
 import io.ktor.server.application.Application
@@ -14,9 +16,6 @@ import io.modelcontextprotocol.kotlin.sdk.server.mcpStreamableHttp
 import io.modelcontextprotocol.kotlin.sdk.types.Implementation
 import io.modelcontextprotocol.kotlin.sdk.types.ServerCapabilities
 import kotlinx.coroutines.CompletableDeferred
-import kotlinx.io.asSink
-import kotlinx.io.asSource
-import kotlinx.io.buffered
 
 private val logger = KotlinLogging.logger {}
 
@@ -30,8 +29,8 @@ suspend fun createStdioMcpServer(adapter: LoxoneAdapter) {
     val server = buildMcpServer(adapter)
 
     val transport = StdioServerTransport(
-        inputStream = System.`in`.asSource().buffered(),
-        outputStream = System.out.asSink().buffered()
+        input = platformStdinSource(),
+        output = platformStdoutSink()
     )
 
     val sessionClosed = CompletableDeferred<Unit>()

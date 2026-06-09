@@ -1,8 +1,9 @@
 package cz.smarteon.loxmcp.config
 
+import cz.smarteon.loxmcp.readFileText
+import cz.smarteon.loxmcp.readResourceBytes
 import com.charleskorn.kaml.Yaml
 import io.github.oshai.kotlinlogging.KotlinLogging
-import java.io.File
 
 private val logger = KotlinLogging.logger {}
 
@@ -44,12 +45,16 @@ object ConfigLoader {
      * If the file doesn't exist, returns a default empty configuration.
      */
     private fun loadFromFile(filePath: String): McpConfig {
-        val file = File(filePath)
-
-        return if (file.exists()) {
-            parseYaml(file.readText(), "file $filePath")
-        } else {
-            logger.warn { "Configuration file not found at $filePath, using defaults" }
+        return try {
+            val content = readFileText(filePath)
+            if (content != null) {
+                parseYaml(content, "file $filePath")
+            } else {
+                logger.warn { "Configuration file not found at $filePath, using defaults" }
+                McpConfig()
+            }
+        } catch (e: Exception) {
+            logger.warn(e) { "Configuration file not accessible at $filePath, using defaults" }
             McpConfig()
         }
     }
@@ -58,10 +63,10 @@ object ConfigLoader {
      * Load configuration from classpath resources.
      */
     private fun loadFromResources(resourcePath: String = "mcp-config.yaml"): McpConfig {
-        val resourceStream = ConfigLoader::class.java.classLoader.getResourceAsStream(resourcePath)
+        val bytes = readResourceBytes(resourcePath)
 
-        return if (resourceStream != null) {
-            val yamlContent = resourceStream.bufferedReader().use { it.readText() }
+        return if (bytes != null) {
+            val yamlContent = bytes.decodeToString()
             parseYaml(yamlContent, "resources: $resourcePath")
         } else {
             logger.warn { "Configuration resource not found: $resourcePath, using defaults" }
