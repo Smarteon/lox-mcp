@@ -38,11 +38,12 @@ class DynamicToolHandler(
     suspend fun handle(arguments: JsonObject): CallToolResult {
         return try {
             when (toolConfig.handler.type) {
-                HandlerTypes.CONTROL_DEVICE -> handleControlDevice(arguments)
-                HandlerTypes.CONTROL_DEVICES_BY_ROOM -> handleControlDevicesByRoom(arguments)
-                HandlerTypes.CONTROL_DEVICES_BY_TYPE -> handleControlDevicesByType(arguments)
-                HandlerTypes.CONTROL_DEVICES_BY_CATEGORY -> handleControlDevicesByCategory(arguments)
+                HandlerTypes.OPERATE_CONTROL -> handleOperateControl(arguments)
+                HandlerTypes.OPERATE_CONTROLS_BY_ROOM -> handleOperateControlsByRoom(arguments)
+                HandlerTypes.OPERATE_CONTROLS_BY_TYPE -> handleOperateControlsByType(arguments)
+                HandlerTypes.OPERATE_CONTROLS_BY_CATEGORY -> handleOperateControlsByCategory(arguments)
                 HandlerTypes.GENERIC_COMMAND -> handleGenericCommand(arguments)
+                HandlerTypes.LIST_PHYSICAL_DEVICES -> handleListPhysicalDevices(arguments)
                 else -> CallToolResult(
                     content = listOf(TextContent("Unknown handler type: ${toolConfig.handler.type}")),
                     isError = true
@@ -57,19 +58,19 @@ class DynamicToolHandler(
         }
     }
 
-    private suspend fun handleControlDevice(arguments: JsonObject): CallToolResult {
-        val deviceId = getRequiredStringArg(arguments, "device_id") ?: return errorResult("Missing required parameter: device_id")
+    private suspend fun handleOperateControl(arguments: JsonObject): CallToolResult {
+        val controlId = getRequiredStringArg(arguments, "control_id") ?: return errorResult("Missing required parameter: control_id")
         val action = getRequiredStringArg(arguments, "action") ?: return errorResult("Missing required parameter: action")
         val value = getOptionalStringArg(arguments, "value")
 
         val command = if (value != null) "$action/$value" else action
-        return executeCommand(deviceId, command, "Device $deviceId $action")
+        return executeCommand(controlId, command, "Control $controlId $action")
     }
 
-    private suspend fun handleControlDevicesByRoom(arguments: JsonObject): CallToolResult {
+    private suspend fun handleOperateControlsByRoom(arguments: JsonObject): CallToolResult {
         val roomName = getRequiredStringArg(arguments, "room") ?: return errorResult("Missing required parameter: room")
         val action = getRequiredStringArg(arguments, "action") ?: return errorResult("Missing required parameter: action")
-        val deviceType = getOptionalStringArg(arguments, "device_type")
+        val controlType = getOptionalStringArg(arguments, "control_type")
         val includeStates = getOptionalBooleanArg(arguments, "include_states") ?: false
 
         val app = adapter.getApp()
@@ -77,31 +78,31 @@ class DynamicToolHandler(
             ?: return errorResult("Room not found: $roomName")
 
         val controls = app.getVisibleControlsForRoom(room.uuid)
-            .filter { deviceType == null || it.type.equals(deviceType, ignoreCase = true) }
+            .filter { controlType == null || it.type.equals(controlType, ignoreCase = true) }
 
         if (controls.isEmpty()) {
-            return errorResult("No devices found in room: $roomName")
+            return errorResult("No controls found in room: $roomName")
         }
 
-        return executeCommandOnMultipleControls(controls, action, "Controlled ${controls.size} devices in $roomName", includeStates)
+        return executeCommandOnMultipleControls(controls, action, "Operated ${controls.size} controls in $roomName", includeStates)
     }
 
-    private suspend fun handleControlDevicesByType(arguments: JsonObject): CallToolResult {
-        val deviceType = getRequiredStringArg(arguments, "device_type") ?: return errorResult("Missing required parameter: device_type")
+    private suspend fun handleOperateControlsByType(arguments: JsonObject): CallToolResult {
+        val controlType = getRequiredStringArg(arguments, "control_type") ?: return errorResult("Missing required parameter: control_type")
         val action = getRequiredStringArg(arguments, "action") ?: return errorResult("Missing required parameter: action")
         val includeStates = getOptionalBooleanArg(arguments, "include_states") ?: false
 
         val app = adapter.getApp()
-        val controls = app.getVisibleControlsByType(deviceType)
+        val controls = app.getVisibleControlsByType(controlType)
 
         if (controls.isEmpty()) {
-            return errorResult("No devices found of type: $deviceType")
+            return errorResult("No controls found of type: $controlType")
         }
 
-        return executeCommandOnMultipleControls(controls, action, "Controlled ${controls.size} devices of type $deviceType", includeStates)
+        return executeCommandOnMultipleControls(controls, action, "Operated ${controls.size} controls of type $controlType", includeStates)
     }
 
-    private suspend fun handleControlDevicesByCategory(arguments: JsonObject): CallToolResult {
+    private suspend fun handleOperateControlsByCategory(arguments: JsonObject): CallToolResult {
         val categoryName = getRequiredStringArg(arguments, "category") ?: return errorResult("Missing required parameter: category")
         val action = getRequiredStringArg(arguments, "action") ?: return errorResult("Missing required parameter: action")
         val includeStates = getOptionalBooleanArg(arguments, "include_states") ?: false
@@ -113,13 +114,13 @@ class DynamicToolHandler(
         val controls = app.getVisibleControlsForCategory(category.uuid)
 
         if (controls.isEmpty()) {
-            return errorResult("No devices found in category: $categoryName")
+            return errorResult("No controls found in category: $categoryName")
         }
 
         return executeCommandOnMultipleControls(
             controls,
             action,
-            "Controlled ${controls.size} devices in category $categoryName",
+            "Operated ${controls.size} controls in category $categoryName",
             includeStates
         )
     }
@@ -132,6 +133,54 @@ class DynamicToolHandler(
         val response = adapter.sendRawCommand(command)
 
         return successResult("Command executed: $command\nResponse: $response")
+    }
+
+    private suspend fun handleListPhysicalDevices(arguments: JsonObject): CallToolResult {
+        val nameFilter = getOptionalStringArg(arguments, "name")
+        val serialFilter = getOptionalStringArg(arguments, "serial")
+        val versionFilter = getOptionalStringArg(arguments, "version")
+        val typeFilter = getOptionalStringArg(arguments, "type")
+        val onlineOnly = getOptionalBooleanArg(arguments, "online_only") ?: false
+
+        val xml = adapter.getPhysicalDevices()
+        val devices = parseDeviceStatusXml(xml)
+            .filter { nameFilter == null || it["Name"]?.contains(nameFilter, ignoreCase = true) == true }
+            .filter { serialFilter == null || it["Serial"] == serialFilter }
+            .filter { versionFilter == null || it["Version"]?.contains(versionFilter) == true }
+            .filter { typeFilter == null || it["Type"]?.equals(typeFilter, ignoreCase = true) == true }
+            .filter { !onlineOnly || it["Online"] == "1" }
+
+        val response = buildJsonObject {
+            put("total", devices.size)
+            putJsonArray("devices") {
+                devices.forEach { device ->
+                    add(buildJsonObject {
+                        device.forEach { (k, v) -> put(k, v) }
+                    })
+                }
+            }
+        }
+        return successResult(json.encodeToString(JsonObject.serializer(), response))
+    }
+
+    private fun parseDeviceStatusXml(xml: String): List<Map<String, String>> {
+        val devices = mutableListOf<Map<String, String>>()
+        val tagPattern = Regex("""<(Miniserver|Extension)\s+([^>]*?)(?:/>|>)""")
+        tagPattern.findAll(xml).forEach { match ->
+            val attrs = extractXmlAttributes(match.groupValues[2]).toMutableMap()
+            attrs["Type"] = match.groupValues[1]
+            devices.add(attrs)
+        }
+        return devices
+    }
+
+    private fun extractXmlAttributes(attrString: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        val attrPattern = Regex("""(\w+)="([^"]*)"""")
+        attrPattern.findAll(attrString).forEach { match ->
+            result[match.groupValues[1]] = match.groupValues[2]
+        }
+        return result
     }
 
     private suspend fun executeCommand(uuid: String, command: String, successMessage: String): CallToolResult {
@@ -158,7 +207,7 @@ class DynamicToolHandler(
         return if (includeStates) {
             val response = buildJsonObject {
                 put("message", summaryMessage)
-                putJsonArray("devices") {
+                putJsonArray("controls") {
                     results.forEach { add(it.jsonObject) }
                 }
             }
