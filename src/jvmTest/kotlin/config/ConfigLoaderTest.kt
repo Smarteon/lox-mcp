@@ -15,8 +15,8 @@ class ConfigLoaderTest : ShouldSpec({
             val config = ConfigLoader.load()
 
             config shouldNotBe null
-            config.tools shouldHaveSize 5
-            config.resources shouldHaveSize 13
+            config.tools shouldHaveSize 6
+            config.resources shouldHaveSize 14
         }
     }
 
@@ -51,8 +51,8 @@ class ConfigLoaderTest : ShouldSpec({
             val config = ConfigLoader.load("nonexistent-file.yaml")
 
             config shouldNotBe null
-            config.tools shouldHaveSize 5
-            config.resources shouldHaveSize 13
+            config.tools shouldHaveSize 6
+            config.resources shouldHaveSize 14
         }
 
         should("handle malformed YAML gracefully") {
@@ -78,8 +78,8 @@ class ConfigLoaderTest : ShouldSpec({
             val config = ConfigLoader.load()
 
             config shouldNotBe null
-            config.tools shouldHaveSize 5
-            config.resources shouldHaveSize 13
+            config.tools shouldHaveSize 6
+            config.resources shouldHaveSize 14
         }
 
         should("merge custom config with internal config") {
@@ -105,8 +105,8 @@ class ConfigLoaderTest : ShouldSpec({
                 val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = false)
 
                 config shouldNotBe null
-                config.tools shouldHaveSize 6  // 5 internal + 1 custom
-                config.resources shouldHaveSize 14  // 13 internal + 1 custom
+                config.tools shouldHaveSize 7  // 6 internal + 1 custom
+                config.resources shouldHaveSize 15  // 14 internal + 1 custom
 
                 // Verify custom tool is present
                 config.tools.any { it.name == "custom_tool" } shouldBe true
@@ -167,7 +167,7 @@ class ConfigLoaderTest : ShouldSpec({
                 val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = false)
 
                 config shouldNotBe null
-                config.tools shouldHaveSize 5  // Still 5 tools, one replaced
+                config.tools shouldHaveSize 6  // Still 6 tools, one replaced
 
                 val sendCommandTool = config.tools.find { it.name == "send_control_command" }
                 sendCommandTool shouldNotBe null
@@ -197,7 +197,7 @@ class ConfigLoaderTest : ShouldSpec({
                 val config = ConfigLoader.load(customConfigPath = tempFile.absolutePath, overrideInternalConfig = false)
 
                 config shouldNotBe null
-                config.resources shouldHaveSize 13
+                config.resources shouldHaveSize 14
 
                 val roomsResource = config.resources.find { it.uri == "loxone://rooms" }
                 roomsResource shouldNotBe null

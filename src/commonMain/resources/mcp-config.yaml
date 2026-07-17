@@ -1,10 +1,10 @@
 tools:
-  - name: control_device
-    description: Control a specific Loxone device by its UUID
+  - name: operate_control
+    description: Send a command to a specific Loxone control by its UUID
     parameters:
-      - name: device_id
+      - name: control_id
         type: string
-        description: The UUID of the device to control
+        description: The UUID of the control to operate
         required: true
       - name: action
         type: string
@@ -16,10 +16,10 @@ tools:
         description: Optional value for the action
         required: false
     handler:
-      type: control_device
+      type: operate_control
 
-  - name: control_devices_by_room
-    description: Control all devices of a specific type in a room
+  - name: operate_controls_by_room
+    description: Send a command to all Loxone controls of a specific type in a room
     parameters:
       - name: room
         type: string
@@ -27,27 +27,27 @@ tools:
         required: true
       - name: action
         type: string
-        description: Action to perform on all devices
+        description: Action to perform on all controls
         required: true
         enum: ["on", "off", "up", "down", "stop"]
-      - name: device_type
+      - name: control_type
         type: string
-        description: Optional device type filter
+        description: Optional control type filter (e.g. LightController, Jalousie)
         required: false
       - name: include_states
         type: boolean
-        description: Include current state values
+        description: Include current state values in the response
         required: false
         default: false
     handler:
-      type: control_devices_by_room
+      type: operate_controls_by_room
 
-  - name: control_devices_by_type
-    description: Control all devices of a specific type
+  - name: operate_controls_by_type
+    description: Send a command to all Loxone controls of a specific type
     parameters:
-      - name: device_type
+      - name: control_type
         type: string
-        description: Type of devices to control
+        description: Type of controls to operate (e.g. LightController, Jalousie)
         required: true
       - name: action
         type: string
@@ -56,14 +56,14 @@ tools:
         enum: ["on", "off", "up", "down", "stop"]
       - name: include_states
         type: boolean
-        description: Include current state values
+        description: Include current state values in the response
         required: false
         default: false
     handler:
-      type: control_devices_by_type
+      type: operate_controls_by_type
 
-  - name: control_devices_by_category
-    description: Control all devices in a specific category
+  - name: operate_controls_by_category
+    description: Send a command to all Loxone controls in a specific category
     parameters:
       - name: category
         type: string
@@ -76,14 +76,41 @@ tools:
         enum: ["on", "off", "up", "down", "stop"]
       - name: include_states
         type: boolean
-        description: Include current state values
+        description: Include current state values in the response
         required: false
         default: false
     handler:
-      type: control_devices_by_category
+      type: operate_controls_by_category
+
+  - name: list_devices
+    description: List physical Loxone hardware devices (Miniserver and Extensions)
+    parameters:
+      - name: name
+        type: string
+        description: Filter by device name (case-insensitive substring match)
+        required: false
+      - name: serial
+        type: string
+        description: Filter by serial number (exact match)
+        required: false
+      - name: version
+        type: string
+        description: Filter by firmware version (substring match)
+        required: false
+      - name: type
+        type: string
+        description: Filter by device type (Miniserver or Extension, case-insensitive)
+        required: false
+      - name: online_only
+        type: boolean
+        description: If true, only return online devices
+        required: false
+        default: false
+    handler:
+      type: list_physical_devices
 
   - name: send_control_command
-    description: Send a command to a device by UUID
+    description: Send a raw command to a Loxone control by UUID
     parameters:
       - name: control
         type: string
@@ -100,7 +127,7 @@ tools:
 resources:
   - uri: "loxone://structure/summary"
     name: Loxone Structure Summary
-    description: Overview of the entire Loxone system structure
+    description: Overview of the entire Loxone system structure including control and room counts
     mimeType: application/json
     handler:
       type: structure_summary
@@ -113,29 +140,29 @@ resources:
       type: rooms_list
 
   - uri: "loxone://rooms/{roomName}/devices"
-    name: Room Devices
-    description: List all devices in a specific room
+    name: Room Controls
+    description: List all Loxone controls in a specific room (URI path uses "/devices" for backward compatibility)
     mimeType: application/json
     handler:
       type: room_devices
 
   - uri: "loxone://devices/all"
-    name: All Devices
-    description: Complete list of all devices in the system
+    name: All Controls
+    description: Complete list of all Loxone controls in the system
     mimeType: application/json
     handler:
       type: devices_all
 
   - uri: "loxone://devices/type/{deviceType}"
-    name: Devices by Type
-    description: List all devices of a specific type
+    name: Controls by Type
+    description: List all Loxone controls of a specific type
     mimeType: application/json
     handler:
       type: devices_by_type
 
   - uri: "loxone://devices/category/{categoryName}"
-    name: Devices by Category
-    description: List all devices in a specific category
+    name: Controls by Category
+    description: List all Loxone controls in a specific category
     mimeType: application/json
     handler:
       type: devices_by_category
@@ -169,22 +196,29 @@ resources:
       type: docs_topic
 
   - uri: "loxone://devices/states"
-    name: All Device States
-    description: Get current state values for all devices
+    name: All Control States
+    description: Get current state values for all Loxone controls
     mimeType: application/json
     handler:
       type: all_device_states
 
   - uri: "loxone://devices/{deviceUuid}/state"
-    name: Device State
-    description: Get current state values for a specific device
+    name: Control State
+    description: Get current state values for a specific Loxone control
     mimeType: application/json
     handler:
       type: device_state
 
   - uri: "loxone://statistics"
-    name: Device Statistics
+    name: Control Statistics
     description: Fetch historical statistics for one or more Loxone controls
     mimeType: application/json
     handler:
       type: statistics
+
+  - uri: "loxone://webservices"
+    name: Loxone Webservices
+    description: Available Loxone Miniserver HTTP API webservice commands organized by category
+    mimeType: application/json
+    handler:
+      type: webservices

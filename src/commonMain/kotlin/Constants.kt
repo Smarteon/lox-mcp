@@ -16,11 +16,12 @@ object Constants {
      */
     object HandlerTypes {
         // Tool handler types
-        const val CONTROL_DEVICE = "control_device"
-        const val CONTROL_DEVICES_BY_ROOM = "control_devices_by_room"
-        const val CONTROL_DEVICES_BY_TYPE = "control_devices_by_type"
-        const val CONTROL_DEVICES_BY_CATEGORY = "control_devices_by_category"
+        const val OPERATE_CONTROL = "operate_control"
+        const val OPERATE_CONTROLS_BY_ROOM = "operate_controls_by_room"
+        const val OPERATE_CONTROLS_BY_TYPE = "operate_controls_by_type"
+        const val OPERATE_CONTROLS_BY_CATEGORY = "operate_controls_by_category"
         const val GENERIC_COMMAND = "generic_command"
+        const val LIST_PHYSICAL_DEVICES = "list_physical_devices"
 
         // Resource handler types
         const val ROOMS_LIST = "rooms_list"
@@ -36,5 +37,6 @@ object Constants {
         const val ALL_DEVICE_STATES = "all_device_states"
         const val DEVICE_STATE = "device_state"
         const val STATISTICS = "statistics"
+        const val WEBSERVICES = "webservices"
     }
 }

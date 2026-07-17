@@ -9,6 +9,7 @@ import cz.smarteon.loxkt.state.TextState
 import cz.smarteon.loxkt.state.ValueState
 import cz.smarteon.loxmcp.Constants.HandlerTypes
 import cz.smarteon.loxmcp.LoxoneAdapter
+import cz.smarteon.loxmcp.readResourceBytes
 import cz.smarteon.loxmcp.config.ResourceConfig
 import cz.smarteon.loxmcp.server.LoxoneQueryHelper.buildDeviceJson
 import cz.smarteon.loxmcp.server.LoxoneQueryHelper.countVisibleControlsInCategory
@@ -64,6 +65,7 @@ class DynamicResourceHandler(
                 HandlerTypes.ALL_DEVICE_STATES -> handleAllDeviceStates(uri)
                 HandlerTypes.DEVICE_STATE -> handleDeviceState(uri)
                 HandlerTypes.STATISTICS -> handleStatistics(uri)
+                HandlerTypes.WEBSERVICES -> handleWebservices(uri)
                 else -> errorResult(uri, "Unknown handler type: ${resourceConfig.handler.type}")
             }
         } catch (e: Exception) {
@@ -78,7 +80,7 @@ class DynamicResourceHandler(
             buildJsonObject {
                 put("uuid", room.uuid)
                 put("name", room.name)
-                put("deviceCount", app.countVisibleControlsInRoom(room.uuid))
+                    put("controlCount", app.countVisibleControlsInRoom(room.uuid))
             }
         }
 
@@ -150,7 +152,7 @@ class DynamicResourceHandler(
                 put("uuid", category.uuid)
                 put("name", category.name)
                 put("type", category.type ?: "unknown")
-                put("deviceCount", app.countVisibleControlsInCategory(category.uuid))
+                put("controlCount", app.countVisibleControlsInCategory(category.uuid))
             }
         }
 
@@ -163,13 +165,13 @@ class DynamicResourceHandler(
 
         val summary = buildJsonObject {
             put("rooms", app.rooms.size)
-            put("devices", app.getVisibleControls().size)
+            put("controls", app.getVisibleControls().size)
             put("categories", app.cats.size)
             putJsonArray("roomList") {
                 app.rooms.values.forEach { room ->
                     add(buildJsonObject {
                         put("name", room.name)
-                        put("deviceCount", app.countVisibleControlsInRoom(room.uuid))
+                put("controlCount", app.countVisibleControlsInRoom(room.uuid))
                     })
                 }
             }
@@ -178,7 +180,7 @@ class DynamicResourceHandler(
                     add(buildJsonObject {
                         put("name", cat.name)
                         put("type", cat.type ?: "unknown")
-                        put("deviceCount", app.countVisibleControlsInCategory(cat.uuid))
+                        put("controlCount", app.countVisibleControlsInCategory(cat.uuid))
                     })
                 }
             }
@@ -202,12 +204,12 @@ class DynamicResourceHandler(
         }
 
         val statesResult = buildJsonObject {
-            put("totalDevices", filteredControls.controls.size)
+            put("totalControls", filteredControls.controls.size)
             put("stateCount", adapter.getState().size())
             if (queryParams.isNotEmpty()) {
                 putJsonObject("filters") { queryParams.forEach { (k, v) -> put(k, v) } }
             }
-            putJsonArray("devices") { deviceJsons.forEach { add(it) } }
+            putJsonArray("controls") { deviceJsons.forEach { add(it) } }
         }
 
         return successResult(uri, json.encodeToString(JsonObject.serializer(), statesResult), "application/json")
@@ -257,11 +259,11 @@ class DynamicResourceHandler(
 
     private suspend fun handleDeviceState(uri: String): ReadResourceResult {
         val deviceUuid = uri.substringAfter("devices/").substringBefore("/state")
-            .takeIf { it.isNotBlank() } ?: return errorResult(uri, "Device UUID not found in URI")
+            .takeIf { it.isNotBlank() } ?: return errorResult(uri, "Control UUID not found in URI")
 
         val app = adapter.getApp()
         val control = app.controls[deviceUuid]
-            ?: return errorResult(uri, "Device not found with UUID: $deviceUuid")
+            ?: return errorResult(uri, "Control not found with UUID: $deviceUuid")
 
         val states = adapter.getControlStates(control)
 
@@ -446,6 +448,12 @@ class DynamicResourceHandler(
             }
             ?.groupBy({ it.first }, { it.second })
             ?: emptyMap()
+
+    private fun handleWebservices(uri: String): ReadResourceResult {
+        val bytes = readResourceBytes("/loxone-docs/webservices.json")
+            ?: return errorResult(uri, "webservices.json not found")
+        return successResult(uri, bytes.decodeToString(), resourceConfig.mimeType)
+    }
 
     /**
      * Parse query parameters from a query string (first value wins for duplicate keys).

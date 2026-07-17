@@ -189,12 +189,18 @@ class LoxoneAdapter(
     }
 
     /**
-     * Send a command to control a device by UUID.
+     * Send a command to a control by UUID.
      */
     suspend fun sendCommand(uuid: String, command: String): String {
-        logger.debug { "Sending command '$command' to device $uuid" }
+        logger.debug { "Sending command '$command' to control $uuid" }
         return getClient().callRaw("jdev/sps/io/$uuid/$command")
     }
+
+    /**
+     * Fetch the list of physical devices (Miniserver and Extensions) as raw XML.
+     * Uses the /status webservice endpoint.
+     */
+    suspend fun getPhysicalDevices(): String = sendRawCommand("status")
 
     /**
      * Initialize WebSocket event streaming for state value updates.

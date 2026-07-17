@@ -42,7 +42,7 @@ private fun registerGetLoxoneXmlTool(server: Server, adapter: LoxoneAdapter) {
     server.addTool(
         name = "get_loxone_xml",
         description = "Fetch the Loxone Miniserver project configuration as XML. " +
-            "Returns the complete automation logic: all rooms, devices, programs, users, " +
+            "Returns the complete automation logic: all rooms, controls, programs, users, " +
             "categories, schedules, and wiring. " +
             "UI-only elements and attributes are stripped to keep the XML within LLM context limits.",
         inputSchema = ToolSchema()
