@@ -141,7 +141,7 @@ resources:
 
   - uri: "loxone://rooms/{roomName}/devices"
     name: Room Controls
-    description: List all Loxone controls in a specific room
+    description: List all Loxone controls in a specific room (URI path uses "/devices" for backward compatibility)
     mimeType: application/json
     handler:
       type: room_devices

@@ -1,0 +1,227 @@
+{
+  "sourceUrl": "https://www.loxone.com/cscz/kb/api-webservices/",
+  "description": "Loxone Miniserver HTTP API webservice commands",
+  "commandFormat": "http://user:password@<miniserver-ip>/<path>",
+  "inputValues": {
+    "digital": ["On", "Off", "1", "0", "Pulse", "ImpulsPlus", "PulseUp", "ImpulsMinus", "PulseDown"],
+    "analog": "Float 0-10.00 (dot as decimal separator)",
+    "text": "UTF-8 string"
+  },
+  "categories": [
+    {
+      "name": "Status & Control",
+      "description": "Read and write Loxone control states via /dev/sps/io/",
+      "commands": [
+        {
+          "path": "/dev/sps/io/{control}/state",
+          "description": "Get input state of a control",
+          "response": "<LL control=\"...\" value=\"0\" Code=\"200\"/>"
+        },
+        {
+          "path": "/dev/sps/io/{control}/astate",
+          "description": "Get output state of a control (unique value, or ? when outputs differ)"
+        },
+        {
+          "path": "/dev/sps/io/{control}/all",
+          "description": "Get all output states with n/u/v fields"
+        },
+        {
+          "path": "/status",
+          "description": "List all connected hardware devices and their status (Miniserver + Extensions as XML)"
+        },
+        {
+          "path": "/dev/sps/io/{control}/{value}",
+          "description": "Send a command to a digital or analog control",
+          "parameters": [
+            {"name": "control", "description": "Control name or UUID"},
+            {"name": "value", "description": "Digital: On/Off/1/0/Pulse/ImpulsPlus/ImpulsMinus; Analog: 0.0-10.0"}
+          ]
+        },
+        {
+          "path": "/dev/sps/enablestatusupdate",
+          "description": "Enable WebSocket status update stream"
+        }
+      ]
+    },
+    {
+      "name": "PLC Commands",
+      "description": "Control the Loxone PLC (Programmable Logic Controller)",
+      "commands": [
+        {
+          "path": "/dev/sps/state",
+          "description": "Get PLC state (0=none, 1=starting, 2=loaded, 3=started, 4=LoxLink started, 5=running, 6=changing, 7=error, 8=updating)"
+        },
+        {"path": "/dev/sps/status", "description": "Get PLC cycle frequency"},
+        {"path": "/dev/sps/restart", "description": "Restart the PLC"},
+        {"path": "/dev/sps/stop", "description": "Stop the PLC"},
+        {"path": "/dev/sps/run", "description": "Resume the PLC after a stop"},
+        {
+          "path": "/dev/sps/log/{ip}",
+          "description": "Enable PLC logging to the given IP address",
+          "parameters": [{"name": "ip", "description": "Target IP address for log output"}]
+        },
+        {"path": "/dev/sps/log", "description": "Stop PLC logging"},
+        {"path": "/dev/sps/enumdev", "description": "List all PLC devices"},
+        {"path": "/dev/sps/enumin", "description": "List all PLC inputs"},
+        {"path": "/dev/sps/enumout", "description": "List all PLC outputs"},
+        {"path": "/dev/sps/identify", "description": "Identify Miniserver or extension (requires serial number)"}
+      ]
+    },
+    {
+      "name": "Configuration",
+      "description": "Read and write Miniserver network and system configuration via /dev/cfg/",
+      "commands": [
+        {"path": "/dev/cfg/mac", "description": "Get MAC address"},
+        {"path": "/dev/cfg/version", "description": "Get firmware version"},
+        {"path": "/dev/cfg/versiondate", "description": "Get firmware build date"},
+        {"path": "/dev/cfg/dhcp", "description": "Get or set DHCP configuration"},
+        {"path": "/dev/cfg/ip", "description": "Get or set IP address"},
+        {"path": "/dev/cfg/mask", "description": "Get or set subnet mask"},
+        {"path": "/dev/cfg/gateway", "description": "Get or set default gateway"},
+        {"path": "/dev/cfg/device", "description": "Get or set Miniserver device name"},
+        {"path": "/dev/cfg/dns1", "description": "Get or set primary DNS server"},
+        {"path": "/dev/cfg/dns2", "description": "Get or set secondary DNS server"},
+        {"path": "/dev/cfg/ntp", "description": "Get or set NTP server address"},
+        {"path": "/dev/cfg/timezoneoffset", "description": "Get or set timezone offset"},
+        {"path": "/dev/cfg/http", "description": "Get or set HTTP port"},
+        {"path": "/dev/cfg/ftp", "description": "Get or set FTP port"},
+        {"path": "/dev/cfg/ftllocalonly", "description": "Get or set FTP/Telnet local-only restriction"}
+      ]
+    },
+    {
+      "name": "System Monitoring",
+      "description": "Real-time system performance metrics via /dev/sys/",
+      "commands": [
+        {"path": "/dev/sys/numtasks", "description": "Number of running tasks"},
+        {"path": "/dev/sys/cpu", "description": "Current CPU load"},
+        {"path": "/dev/sys/contextswitches", "description": "Context switch count"},
+        {"path": "/dev/sys/contextswitchesi", "description": "Interrupt context switch count"},
+        {"path": "/dev/sys/heap", "description": "Heap memory usage"},
+        {"path": "/dev/sys/ints", "description": "System interrupt count"},
+        {"path": "/dev/sys/comints", "description": "Communication interrupt count"},
+        {"path": "/dev/sys/lanints", "description": "LAN interrupt count"},
+        {"path": "/dev/sys/watchdog", "description": "Watchdog status bits"}
+      ]
+    },
+    {
+      "name": "Date & Time",
+      "description": "Read and set Miniserver date/time",
+      "commands": [
+        {"path": "/dev/sys/date", "description": "Get local date"},
+        {"path": "/dev/sys/time", "description": "Get local time"},
+        {
+          "path": "/dev/sys/setdatetime",
+          "description": "Set date and time",
+          "parameters": [{"name": "datetime", "description": "Format: YYYY-MM-DD HH:MM:SS or DD/MM/YYYY HH:MM:SS"}]
+        },
+        {"path": "/dev/sys/ntp", "description": "Force NTP time synchronization"}
+      ]
+    },
+    {
+      "name": "Task Monitoring",
+      "description": "Per-task metrics — replace {N} with the task index (0-based, up to numtasks-1)",
+      "commands": [
+        {"path": "/dev/task{N}/name", "description": "Task name"},
+        {"path": "/dev/task{N}/priority", "description": "Task scheduling priority"},
+        {"path": "/dev/task{N}/stack", "description": "Task stack usage"},
+        {"path": "/dev/task{N}/contextswitches", "description": "Task context switch count"},
+        {"path": "/dev/task{N}/waittimeout", "description": "Task wait timeout in milliseconds"},
+        {"path": "/dev/task{N}/state", "description": "Task state"}
+      ]
+    },
+    {
+      "name": "System Control & File Management",
+      "description": "Reboot, connection management, SD card, and file system operations",
+      "commands": [
+        {"path": "/dev/sys/reboot", "description": "Reboot the Miniserver"},
+        {"path": "/dev/sys/check", "description": "Check active connections"},
+        {"path": "/dev/sys/logoff", "description": "Log off all active connections"},
+        {"path": "/dev/sys/sdtest", "description": "Test the SD card"},
+        {"path": "/dev/fslist/", "description": "List root SD card directory"},
+        {
+          "path": "/dev/fslist/{path}/",
+          "description": "List a specific SD card directory",
+          "parameters": [{"name": "path", "description": "Directory path on the SD card"}]
+        },
+        {
+          "path": "/dev/fsget/{filepath}",
+          "description": "Download a file from the SD card",
+          "parameters": [{"name": "filepath", "description": "File path on the SD card"}]
+        },
+        {
+          "path": "/dev/fsdel/{filepath}",
+          "description": "Delete a file from the SD card",
+          "parameters": [{"name": "filepath", "description": "File path on the SD card"}]
+        }
+      ]
+    },
+    {
+      "name": "System Logs & Stats",
+      "description": "System-level logs, statistics, and firmware updates",
+      "commands": [
+        {"path": "/data/status", "description": "System status as XML"},
+        {"path": "/stats", "description": "System statistics"},
+        {"path": "/dev/fsget/log/def.log", "description": "Download the system log file"},
+        {"path": "/dev/sys/updatetolatestrelease", "description": "Update Miniserver to the latest firmware release"}
+      ]
+    },
+    {
+      "name": "External Web Service",
+      "description": "Send HTTP requests to external devices through the Miniserver",
+      "commands": [
+        {
+          "path": "/jdev/sys/sendwebservice",
+          "description": "Send an HTTP request to an external device from the Miniserver",
+          "parameters": [
+            {"name": "json", "description": "JSON object with 'address' (IP) and 'webservice' (path) fields"}
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Extension Commands",
+      "description": "Manage LoxLink/Tree extensions by serial number",
+      "commands": [
+        {
+          "path": "/dev/sys/wsextension/{serial}/ForceUpdate/0C000001/{DeviceIndex}",
+          "description": "Force firmware update on an extension",
+          "parameters": [
+            {"name": "serial", "description": "Extension serial number"},
+            {"name": "DeviceIndex", "description": "Device index"}
+          ]
+        },
+        {
+          "path": "/dev/sys/wsextension/{serial}/Reboot",
+          "description": "Restart an extension",
+          "parameters": [{"name": "serial", "description": "Extension serial number"}]
+        }
+      ]
+    },
+    {
+      "name": "Tree & Air Device Commands",
+      "description": "Manage Tree bus and Air wireless devices by serial number",
+      "commands": [
+        {
+          "path": "/dev/sys/wsdevice/{serial}/ForceUpdate/0C000001/{DeviceIndex}",
+          "description": "Force firmware update on a Tree/Air device",
+          "parameters": [
+            {"name": "serial", "description": "Device serial number"},
+            {"name": "DeviceIndex", "description": "Device index"}
+          ]
+        },
+        {
+          "path": "/dev/sys/wsdevice/{serial}/Reboot",
+          "description": "Restart a Tree/Air device",
+          "parameters": [{"name": "serial", "description": "Device serial number"}]
+        }
+      ]
+    },
+    {
+      "name": "iFrame",
+      "description": "Configure Miniserver WebUI embedding",
+      "commands": [
+        {"path": "/dev/sys/allowhttpiframe/1", "description": "Allow Miniserver web UI to be embedded in an iFrame"}
+      ]
+    }
+  ]
+}
