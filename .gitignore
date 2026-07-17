@@ -22,3 +22,14 @@ configurator/src-tauri/target/
 configurator/src-tauri/gen/
 .DS_Store
 src/.DS_Store
+
+# Kotlin build cache
+.kotlin/
+
+# AI assistant context
+.ai/
+
+# Test/scratch scripts
+test_output.txt
+test_sse_sessions.py
+test_streamable_http.py

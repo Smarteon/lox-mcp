@@ -103,7 +103,7 @@ private fun registerResourceAsTool(server: Server, adapter: LoxoneAdapter, resou
 
 /**
  * Extract parameter names from URI template.
- * Example: "loxone://rooms/{roomName}/devices" -> ["roomName"]
+ * Example: "loxone://rooms/{roomName}/controls" -> ["roomName"]
  */
 private fun extractUriParameters(uri: String): List<String> {
     return URI_PARAM_PATTERN.findAll(uri)

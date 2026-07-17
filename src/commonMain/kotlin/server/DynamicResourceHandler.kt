@@ -34,6 +34,8 @@ import kotlinx.serialization.json.JsonPrimitive
 import kotlinx.serialization.json.buildJsonObject
 import kotlinx.serialization.json.put
 import kotlinx.serialization.json.putJsonArray
+import kotlinx.serialization.json.jsonObject
+import kotlinx.serialization.json.jsonPrimitive
 import kotlinx.serialization.json.putJsonObject
 
 private val logger = KotlinLogging.logger {}
@@ -66,6 +68,12 @@ class DynamicResourceHandler(
                 HandlerTypes.DEVICE_STATE -> handleDeviceState(uri)
                 HandlerTypes.STATISTICS -> handleStatistics(uri)
                 HandlerTypes.WEBSERVICES -> handleWebservices(uri)
+                HandlerTypes.DIAGNOSTIC_SCENARIOS -> handleDiagnosticScenarios(uri)
+                HandlerTypes.SYSTEM_LOG -> handleSystemLog(uri)
+                HandlerTypes.DEVICES_WITH_STATISTICS -> handleDevicesWithStatistics(uri)
+                HandlerTypes.SYSTEM_STATUS -> handleSystemStatus(uri)
+                HandlerTypes.PHYSICAL_DEVICES -> handlePhysicalDevices(uri)
+                HandlerTypes.SYSTEM_STATS -> handleSystemStats(uri)
                 else -> errorResult(uri, "Unknown handler type: ${resourceConfig.handler.type}")
             }
         } catch (e: Exception) {
@@ -89,7 +97,7 @@ class DynamicResourceHandler(
     }
 
     private suspend fun handleRoomDevices(uri: String): ReadResourceResult {
-        val roomName = uri.substringAfter("rooms/").substringBefore("/devices")
+        val roomName = uri.substringAfter("rooms/").substringBefore("/controls")
         if (roomName.isBlank()) {
             return errorResult(uri, "Room name not found in URI")
         }
@@ -258,7 +266,7 @@ class DynamicResourceHandler(
     }
 
     private suspend fun handleDeviceState(uri: String): ReadResourceResult {
-        val deviceUuid = uri.substringAfter("devices/").substringBefore("/state")
+        val deviceUuid = uri.substringAfter("controls/").substringBefore("/state")
             .takeIf { it.isNotBlank() } ?: return errorResult(uri, "Control UUID not found in URI")
 
         val app = adapter.getApp()
@@ -453,6 +461,167 @@ class DynamicResourceHandler(
         val bytes = readResourceBytes("/loxone-docs/webservices.json")
             ?: return errorResult(uri, "webservices.json not found")
         return successResult(uri, bytes.decodeToString(), resourceConfig.mimeType)
+    }
+
+    private fun handleDiagnosticScenarios(uri: String): ReadResourceResult {
+        val bytes = readResourceBytes("/loxone-docs/diagnostic-scenarios.json")
+            ?: return errorResult(uri, "diagnostic-scenarios.json not found")
+        return successResult(uri, bytes.decodeToString(), resourceConfig.mimeType)
+    }
+
+    private suspend fun handleSystemLog(uri: String): ReadResourceResult {
+        val queryString = uri.substringAfter("?", "")
+        val lines = (parseQueryParams(queryString)["lines"]?.toIntOrNull() ?: 200).coerceIn(1, 1000)
+
+        val log = adapter.sendRawCommand("dev/fsget/log/def.log")
+        val truncated = log.lines().takeLast(lines).joinToString("\n")
+        return successResult(uri, truncated, resourceConfig.mimeType)
+    }
+
+    private suspend fun handleDevicesWithStatistics(uri: String): ReadResourceResult {
+        val app = adapter.getApp()
+        val controls = app.controls.values.filter { it.statistic != null || it.statisticV2 != null }
+
+        val result = controls.map { control ->
+            buildJsonObject {
+                put("uuid", control.uuidAction)
+                put("name", control.name)
+                put("type", control.type)
+                control.room?.let { put("room", app.rooms[it]?.name) }
+                put("statisticVersion", if (control.statisticV2 != null) "v2" else "v1")
+                control.statistic?.outputs?.let { outputs ->
+                    putJsonArray("outputs") { outputs.forEach { o -> add(JsonPrimitive(o.name)) } }
+                }
+                control.statisticV2?.groups?.firstOrNull()?.dataPoints?.let { dps ->
+                    putJsonArray("outputs") { dps.forEach { dp -> add(JsonPrimitive(dp.title ?: dp.output ?: "value")) } }
+                }
+            }
+        }
+
+        val content = json.encodeToString(JsonArray.serializer(), JsonArray(result))
+        return successResult(uri, content, resourceConfig.mimeType)
+    }
+
+    private suspend fun handleSystemStatus(uri: String): ReadResourceResult {
+        fun parseValue(response: String): String =
+            Regex("""value="([^"]+)"""").find(response)?.groupValues?.get(1) ?: response.trim()
+
+        val plcStateRaw = parseValue(adapter.sendRawCommand("dev/sps/state")).toIntOrNull() ?: -1
+        val cpuRaw = parseValue(adapter.sendRawCommand("dev/sys/cpu")).toIntOrNull() ?: -1
+        val heapRaw = parseValue(adapter.sendRawCommand("dev/sys/heap")).toLongOrNull() ?: -1L
+        val cycleStatus = parseValue(adapter.sendRawCommand("dev/sps/status"))
+        val version = parseValue(adapter.sendRawCommand("dev/cfg/version"))
+        val systemTime = parseValue(adapter.sendRawCommand("dev/sys/time"))
+        val ip = parseValue(adapter.sendRawCommand("dev/cfg/ip"))
+        val dns = parseValue(adapter.sendRawCommand("dev/cfg/dns1"))
+        val ntp = parseValue(adapter.sendRawCommand("dev/cfg/ntp"))
+
+        val plcStateLabel = when (plcStateRaw) {
+            0 -> "none"; 1 -> "starting"; 2 -> "loaded"; 3 -> "started"
+            4 -> "LoxLink started"; 5 -> "running"; 6 -> "changing"
+            7 -> "error"; 8 -> "updating"; else -> "unknown"
+        }
+
+        val result = buildJsonObject {
+            putJsonObject("plc") {
+                put("state", plcStateRaw)
+                put("stateLabel", plcStateLabel)
+                put("healthy", plcStateRaw == 5)
+                put("cycleStatus", cycleStatus)
+            }
+            putJsonObject("system") {
+                put("cpuPercent", cpuRaw)
+                put("cpuHealthy", cpuRaw in 0..79)
+                put("heapBytes", heapRaw)
+                put("heapHealthy", heapRaw > 10000L)
+                put("firmwareVersion", version)
+                put("systemTime", systemTime)
+            }
+            putJsonObject("network") {
+                put("ip", ip)
+                put("dns", dns)
+                put("ntp", ntp)
+            }
+        }
+
+        return successResult(uri, result.toString(), resourceConfig.mimeType)
+    }
+
+    private suspend fun handlePhysicalDevices(uri: String): ReadResourceResult {
+        val queryParams = parseQueryParams(uri.substringAfter("?", ""))
+        val nameFilter = queryParams["name"]
+        val serialFilter = queryParams["serial"]
+        val versionFilter = queryParams["version"]
+        val typeFilter = queryParams["type"]
+        val onlineOnly = queryParams["online_only"]?.toBooleanStrictOrNull() ?: false
+
+        val xml = adapter.getPhysicalDevices()
+        val devices = parsePhysicalDeviceXml(xml)
+            .filter { nameFilter == null || it["Name"]?.contains(nameFilter, ignoreCase = true) == true }
+            .filter { serialFilter == null || it["Serial"] == serialFilter }
+            .filter { versionFilter == null || it["Version"]?.contains(versionFilter) == true }
+            .filter { typeFilter == null || it["Type"]?.equals(typeFilter, ignoreCase = true) == true }
+            .filter { !onlineOnly || it["Online"]?.lowercase() == "true" || it["Offline"]?.lowercase() == "false" }
+
+        val response = buildJsonObject {
+            put("total", devices.size)
+            putJsonArray("devices") {
+                devices.forEach { device ->
+                    add(buildJsonObject {
+                        device.forEach { (k, v) -> put(k, v) }
+                    })
+                }
+            }
+        }
+        return successResult(uri, json.encodeToString(JsonObject.serializer(), response), resourceConfig.mimeType)
+    }
+
+    private fun parsePhysicalDeviceXml(xml: String): List<Map<String, String>> {
+        data class Frame(val tag: String, val attrs: Map<String, String>)
+
+        val results = mutableListOf<Map<String, String>>()
+        val stack = ArrayDeque<Frame>()
+        val tokenPattern = Regex("""<(/)?(\w+)([^>]*?)(/?)>""")
+
+        tokenPattern.findAll(xml).forEach { match ->
+            val isClosing = match.groupValues[1] == "/"
+            val isSelfClosing = match.groupValues[4] == "/"
+            val tagName = match.groupValues[2]
+            val tagAttrs = extractXmlAttributes(match.groupValues[3])
+            val isDevice = tagAttrs.containsKey("Online") || tagAttrs.containsKey("Offline")
+
+            if (isClosing) {
+                if (stack.lastOrNull()?.tag == tagName) stack.removeLast()
+            } else {
+                if (isDevice) {
+                    val device = tagAttrs.toMutableMap()
+                    if (!device.containsKey("Type")) device["Type"] = tagName
+                    // Attach immediate non-root parent context (branch/extension the device is on)
+                    stack.lastOrNull()?.takeIf { it.tag != "Miniserver" }?.let { parent ->
+                        device["parentType"] = parent.attrs["Type"] ?: parent.tag
+                        device["parentName"] = parent.attrs["Name"] ?: parent.tag
+                        parent.attrs["Serial"]?.let { device["parentSerial"] = it }
+                    }
+                    results.add(device.toMap())
+                }
+                if (!isSelfClosing) stack.addLast(Frame(tagName, tagAttrs))
+            }
+        }
+        return results
+    }
+
+    private fun extractXmlAttributes(attrString: String): Map<String, String> {
+        val result = mutableMapOf<String, String>()
+        val attrPattern = Regex("""(\w+)="([^"]*)"""")
+        attrPattern.findAll(attrString).forEach { match ->
+            result[match.groupValues[1]] = match.groupValues[2]
+        }
+        return result
+    }
+
+    private suspend fun handleSystemStats(uri: String): ReadResourceResult {
+        val response = adapter.sendRawCommand("stats/")
+        return successResult(uri, response, resourceConfig.mimeType)
     }
 
     /**

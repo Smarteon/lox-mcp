@@ -21,7 +21,6 @@ object Constants {
         const val OPERATE_CONTROLS_BY_TYPE = "operate_controls_by_type"
         const val OPERATE_CONTROLS_BY_CATEGORY = "operate_controls_by_category"
         const val GENERIC_COMMAND = "generic_command"
-        const val LIST_PHYSICAL_DEVICES = "list_physical_devices"
 
         // Resource handler types
         const val ROOMS_LIST = "rooms_list"
@@ -38,5 +37,11 @@ object Constants {
         const val DEVICE_STATE = "device_state"
         const val STATISTICS = "statistics"
         const val WEBSERVICES = "webservices"
+        const val DIAGNOSTIC_SCENARIOS = "diagnostic_scenarios"
+        const val SYSTEM_LOG = "system_log"
+        const val DEVICES_WITH_STATISTICS = "devices_with_statistics"
+        const val SYSTEM_STATUS = "system_status"
+        const val PHYSICAL_DEVICES = "physical_devices"
+        const val SYSTEM_STATS = "system_stats"
     }
 }
