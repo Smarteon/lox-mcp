@@ -1,0 +1,241 @@
+{
+  "description": "Step-by-step diagnostic workflows for common Loxone Miniserver troubleshooting scenarios. Each scenario lists symptoms, the sequence of MCP resources and tools to use, and how to interpret results.",
+  "scenarios": [
+    {
+      "id": "miniserver-health",
+      "title": "General Miniserver Health Check",
+      "symptoms": [
+        "Miniserver responds slowly",
+        "Periodic timeouts or disconnects",
+        "Routine health check requested"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "description": "Read aggregated health snapshot",
+          "resource": "loxone://system/status",
+          "interpret": "Check plc.healthy (should be true, state=5=running). cpuHealthy=false means >80% CPU load. heapHealthy=false means <10000 bytes free — instability risk. Review firmwareVersion against latest release. Any unhealthy flag warrants further investigation."
+        }
+      ]
+    },
+    {
+      "id": "plc-error",
+      "title": "PLC Stopped or in Error State",
+      "symptoms": [
+        "All controls stopped responding",
+        "Automations not triggering",
+        "PLC state is not 5 (running)"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "description": "Confirm PLC state via aggregated health snapshot",
+          "resource": "loxone://system/status",
+          "interpret": "Check plc.state and plc.healthy. 7 = error, 0 = not started. If plc.healthy is false, proceed."
+        },
+        {
+          "step": 2,
+          "description": "Check system log for the error",
+          "resource": "loxone://system/log",
+          "query": "?lines=100",
+          "interpret": "Look for ERROR or WARN lines near the timestamp when problems started."
+        },
+        {
+          "step": 3,
+          "description": "If PLC is stopped, try resuming",
+          "tool": "send_miniserver_command",
+          "args": {"path": "dev/sps/run"},
+          "interpret": "Resumes the PLC after a stop. Re-check loxone://system/status afterwards."
+        },
+        {
+          "step": 4,
+          "description": "If resume fails, restart the PLC",
+          "tool": "send_miniserver_command",
+          "args": {"path": "dev/sps/restart"},
+          "interpret": "Full PLC restart. Controls will be temporarily unavailable. Check state again after 10-15 seconds."
+        },
+        {
+          "step": 5,
+          "description": "If still failing, reboot the Miniserver",
+          "tool": "send_miniserver_command",
+          "args": {"path": "dev/sys/reboot"},
+          "caution": "This disconnects all clients. Only do this if PLC restart did not help."
+        }
+      ]
+    },
+    {
+      "id": "control-not-responding",
+      "title": "Specific Control Not Responding",
+      "symptoms": [
+        "One control does not react to commands",
+        "Control state appears stuck",
+        "operate_control returns success but nothing happens"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "description": "Get current state of the control",
+          "resource": "loxone://controls/{uuid}/state",
+          "interpret": "Check if statesAvailable is true. If false, state updates may not be streaming — enableStateUpdates may be needed."
+        },
+        {
+          "step": 2,
+          "description": "Cross-check state via MCP device state resource",
+          "resource": "loxone://controls/{uuid}/state",
+          "interpret": "Verify statesAvailable and compare state values. If no states, state streaming may not be active."
+        },
+        {
+          "step": 3,
+          "description": "List PLC outputs to find the control's physical output",
+          "tool": "send_miniserver_command",
+          "args": {"path": "dev/sps/enumout"},
+          "interpret": "Returns all output names and UUIDs. Find the control's outputs and verify they are listed."
+        },
+        {
+          "step": 4,
+          "description": "Check all physical hardware devices for offline status",
+          "resource": "loxone://devices",
+          "query": "?online_only=false",
+          "interpret": "Look for devices where Online=0. An offline extension would explain why controls on it don't work."
+        },
+        {
+          "step": 5,
+          "description": "Review recent log entries for errors related to this control",
+          "resource": "loxone://system/log",
+          "query": "?lines=50"
+        }
+      ]
+    },
+    {
+      "id": "offline-hardware",
+      "title": "Finding Offline or Disconnected Hardware",
+      "symptoms": [
+        "Some devices or extensions not responding",
+        "Controls in a specific room all stopped working",
+        "Extension LED showing error"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "description": "List all physical devices including offline ones",
+          "resource": "loxone://devices",
+          "query": "?online_only=false",
+          "interpret": "Devices with Online=0 are disconnected. Note the Serial number of offline devices."
+        },
+        {
+          "step": 2,
+          "description": "Get full hardware status XML for more detail",
+          "tool": "send_miniserver_command",
+          "args": {"path": "data/status"},
+          "interpret": "Full XML with all extensions and their states. More detailed than the physical devices resource."
+        },
+        {
+          "step": 3,
+          "description": "List all PLC devices for extension inventory",
+          "tool": "send_miniserver_command",
+          "args": {"path": "dev/sps/enumdev"},
+          "interpret": "All devices registered in the PLC. Cross-reference with loxone://devices to find gaps."
+        },
+        {
+          "step": 4,
+          "description": "Try rebooting a specific offline extension (replace SERIAL with actual serial)",
+          "tool": "send_miniserver_command",
+          "args": {"path": "dev/sys/wsextension/SERIAL/Reboot"},
+          "interpret": "Sends a reboot command to the extension. Wait 30 seconds and re-check loxone://devices."
+        },
+        {
+          "step": 5,
+          "description": "For Tree/Air devices, try rebooting the device",
+          "tool": "send_miniserver_command",
+          "args": {"path": "dev/sys/wsdevice/SERIAL/Reboot"},
+          "interpret": "Reboots a Tree bus or Air wireless device. Use the device serial from loxone://devices."
+        }
+      ]
+    },
+    {
+      "id": "system-log-review",
+      "title": "Reviewing System Logs for Errors",
+      "symptoms": [
+        "Intermittent issues at specific times",
+        "Unexplained control behavior",
+        "Need to find when an event occurred"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "description": "Get the last 200 lines of the system log",
+          "resource": "loxone://system/log",
+          "interpret": "Look for lines containing ERROR, WARN, or unusual messages. Timestamps help narrow down when issues started."
+        },
+        {
+          "step": 2,
+          "description": "Get more log history if needed",
+          "resource": "loxone://system/log",
+          "query": "?lines=500",
+          "interpret": "Increase the line count for more history. The log rotates so very old entries may not be available."
+        },
+        {
+          "step": 3,
+          "description": "Check system statistics for historical load info",
+          "resource": "loxone://system/stats",
+          "interpret": "System-level statistics. Complements the log with numeric performance data."
+        }
+      ]
+    },
+    {
+      "id": "statistics-investigation",
+      "title": "Investigating Energy or Sensor Statistics",
+      "symptoms": [
+        "Need to analyze historical sensor data",
+        "Energy consumption review",
+        "Temperature or humidity trends"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "description": "Find all controls that have statistics configured",
+          "resource": "loxone://controls/with-statistics",
+          "interpret": "Lists all controls with statistic or statisticV2 configured. Note the UUIDs of controls you want to analyze."
+        },
+        {
+          "step": 2,
+          "description": "Fetch statistics for a specific control",
+          "resource": "loxone://statistics",
+          "query": "?uuid={uuid}&from=2024-01-01T00:00:00Z&to=2024-01-31T23:59:59Z&unit=DAY",
+          "interpret": "Returns time-series data. unit can be HOUR, DAY, MONTH, or YEAR. Adjust date range as needed."
+        },
+        {
+          "step": 3,
+          "description": "Fetch statistics for multiple controls in one request",
+          "resource": "loxone://statistics",
+          "query": "?uuid={uuid1}&from=...&to=...&uuid={uuid2}&from=...&to=...",
+          "interpret": "Repeat uuid/from/to triples for each control. All must have matching counts."
+        }
+      ]
+    },
+    {
+      "id": "network-config",
+      "title": "Checking Network Configuration",
+      "symptoms": [
+        "Connectivity issues",
+        "Miniserver unreachable from outside",
+        "DNS or NTP problems"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "description": "Read full network configuration from aggregated health snapshot",
+          "resource": "loxone://system/status",
+          "interpret": "Check network.ip, network.dns, and network.ntp. Also review system.systemTime to verify NTP is working correctly. Incorrect IP or DNS explains connectivity and cloud service failures."
+        },
+        {
+          "step": 2,
+          "description": "Force NTP resync if time is wrong",
+          "tool": "send_miniserver_command",
+          "args": {"path": "dev/sys/ntp"},
+          "interpret": "Forces an immediate NTP synchronization. Re-read loxone://system/status afterwards to confirm system.systemTime updated."
+        }
+      ]
+    }
+  ]
+}

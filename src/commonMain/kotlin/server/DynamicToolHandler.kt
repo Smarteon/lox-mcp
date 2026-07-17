@@ -43,7 +43,6 @@ class DynamicToolHandler(
                 HandlerTypes.OPERATE_CONTROLS_BY_TYPE -> handleOperateControlsByType(arguments)
                 HandlerTypes.OPERATE_CONTROLS_BY_CATEGORY -> handleOperateControlsByCategory(arguments)
                 HandlerTypes.GENERIC_COMMAND -> handleGenericCommand(arguments)
-                HandlerTypes.LIST_PHYSICAL_DEVICES -> handleListPhysicalDevices(arguments)
                 else -> CallToolResult(
                     content = listOf(TextContent("Unknown handler type: ${toolConfig.handler.type}")),
                     isError = true
@@ -133,54 +132,6 @@ class DynamicToolHandler(
         val response = adapter.sendRawCommand(command)
 
         return successResult("Command executed: $command\nResponse: $response")
-    }
-
-    private suspend fun handleListPhysicalDevices(arguments: JsonObject): CallToolResult {
-        val nameFilter = getOptionalStringArg(arguments, "name")
-        val serialFilter = getOptionalStringArg(arguments, "serial")
-        val versionFilter = getOptionalStringArg(arguments, "version")
-        val typeFilter = getOptionalStringArg(arguments, "type")
-        val onlineOnly = getOptionalBooleanArg(arguments, "online_only") ?: false
-
-        val xml = adapter.getPhysicalDevices()
-        val devices = parseDeviceStatusXml(xml)
-            .filter { nameFilter == null || it["Name"]?.contains(nameFilter, ignoreCase = true) == true }
-            .filter { serialFilter == null || it["Serial"] == serialFilter }
-            .filter { versionFilter == null || it["Version"]?.contains(versionFilter) == true }
-            .filter { typeFilter == null || it["Type"]?.equals(typeFilter, ignoreCase = true) == true }
-            .filter { !onlineOnly || it["Online"] == "1" }
-
-        val response = buildJsonObject {
-            put("total", devices.size)
-            putJsonArray("devices") {
-                devices.forEach { device ->
-                    add(buildJsonObject {
-                        device.forEach { (k, v) -> put(k, v) }
-                    })
-                }
-            }
-        }
-        return successResult(json.encodeToString(JsonObject.serializer(), response))
-    }
-
-    private fun parseDeviceStatusXml(xml: String): List<Map<String, String>> {
-        val devices = mutableListOf<Map<String, String>>()
-        val tagPattern = Regex("""<(Miniserver|Extension)\s+([^>]*?)(?:/>|>)""")
-        tagPattern.findAll(xml).forEach { match ->
-            val attrs = extractXmlAttributes(match.groupValues[2]).toMutableMap()
-            attrs["Type"] = match.groupValues[1]
-            devices.add(attrs)
-        }
-        return devices
-    }
-
-    private fun extractXmlAttributes(attrString: String): Map<String, String> {
-        val result = mutableMapOf<String, String>()
-        val attrPattern = Regex("""(\w+)="([^"]*)"""")
-        attrPattern.findAll(attrString).forEach { match ->
-            result[match.groupValues[1]] = match.groupValues[2]
-        }
-        return result
     }
 
     private suspend fun executeCommand(uuid: String, command: String, successMessage: String): CallToolResult {

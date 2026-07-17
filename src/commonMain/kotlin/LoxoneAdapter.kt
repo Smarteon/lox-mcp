@@ -197,10 +197,10 @@ class LoxoneAdapter(
     }
 
     /**
-     * Fetch the list of physical devices (Miniserver and Extensions) as raw XML.
-     * Uses the /status webservice endpoint.
+     * Fetch the list of physical devices (Miniserver, extensions, Tree/Air devices) as raw XML.
+     * Uses the data/status webservice endpoint.
      */
-    suspend fun getPhysicalDevices(): String = sendRawCommand("status")
+    suspend fun getPhysicalDevices(): String = sendRawCommand("data/status")
 
     /**
      * Initialize WebSocket event streaming for state value updates.

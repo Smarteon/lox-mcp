@@ -19,7 +19,6 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
 import kotlinx.serialization.json.Json
-import kotlin.system.exitProcess
 
 private val logger = KotlinLogging.logger {}
 
@@ -153,8 +152,7 @@ private fun initAdapter(args: Array<String>, scope: CoroutineScope): LoxoneAdapt
     val credentials: LoxoneCredentials = try {
         source.get()
     } catch (e: Exception) {
-        logger.error { e.message }
-        exitProcess(1)
+        error(e.message ?: "Cannot resolve credentials")
     }
 
     return LoxoneAdapter(

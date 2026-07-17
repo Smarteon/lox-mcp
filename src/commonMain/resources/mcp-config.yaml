@@ -82,33 +82,6 @@ tools:
     handler:
       type: operate_controls_by_category
 
-  - name: list_devices
-    description: List physical Loxone hardware devices (Miniserver and Extensions)
-    parameters:
-      - name: name
-        type: string
-        description: Filter by device name (case-insensitive substring match)
-        required: false
-      - name: serial
-        type: string
-        description: Filter by serial number (exact match)
-        required: false
-      - name: version
-        type: string
-        description: Filter by firmware version (substring match)
-        required: false
-      - name: type
-        type: string
-        description: Filter by device type (Miniserver or Extension, case-insensitive)
-        required: false
-      - name: online_only
-        type: boolean
-        description: If true, only return online devices
-        required: false
-        default: false
-    handler:
-      type: list_physical_devices
-
   - name: send_control_command
     description: Send a raw command to a Loxone control by UUID
     parameters:
@@ -123,6 +96,25 @@ tools:
     handler:
       type: generic_command
       commandTemplate: "/jdev/sps/io/{control}/{action}"
+
+  - name: send_miniserver_command
+    description: >
+      Send any raw HTTP GET command to the Loxone Miniserver and return the response.
+      WARNING: Some endpoints can trigger destructive actions (reboot, config changes, file operations).
+      Use only for diagnostics and only when explicitly requested by the user.
+      See loxone://webservices for the full list of available paths.
+      Examples: "dev/sps/state", "dev/sys/cpu", "dev/sys/heap", "dev/cfg/version",
+      "dev/sps/enumdev", "data/status", "stats"
+    parameters:
+      - name: path
+        type: string
+        description: >
+          The Miniserver API path to call (without leading slash).
+          E.g. "dev/sps/state", "dev/sys/cpu", "dev/fsget/log/def.log"
+        required: true
+    handler:
+      type: generic_command
+      commandTemplate: "{path}"
 
 resources:
   - uri: "loxone://structure/summary"
@@ -139,28 +131,28 @@ resources:
     handler:
       type: rooms_list
 
-  - uri: "loxone://rooms/{roomName}/devices"
+  - uri: "loxone://rooms/{roomName}/controls"
     name: Room Controls
-    description: List all Loxone controls in a specific room (URI path uses "/devices" for backward compatibility)
+    description: List all Loxone controls in a specific room
     mimeType: application/json
     handler:
       type: room_devices
 
-  - uri: "loxone://devices/all"
+  - uri: "loxone://controls/all"
     name: All Controls
     description: Complete list of all Loxone controls in the system
     mimeType: application/json
     handler:
       type: devices_all
 
-  - uri: "loxone://devices/type/{deviceType}"
+  - uri: "loxone://controls/type/{deviceType}"
     name: Controls by Type
     description: List all Loxone controls of a specific type
     mimeType: application/json
     handler:
       type: devices_by_type
 
-  - uri: "loxone://devices/category/{categoryName}"
+  - uri: "loxone://controls/category/{categoryName}"
     name: Controls by Category
     description: List all Loxone controls in a specific category
     mimeType: application/json
@@ -195,14 +187,14 @@ resources:
     handler:
       type: docs_topic
 
-  - uri: "loxone://devices/states"
+  - uri: "loxone://controls/states"
     name: All Control States
     description: Get current state values for all Loxone controls
     mimeType: application/json
     handler:
       type: all_device_states
 
-  - uri: "loxone://devices/{deviceUuid}/state"
+  - uri: "loxone://controls/{deviceUuid}/state"
     name: Control State
     description: Get current state values for a specific Loxone control
     mimeType: application/json
@@ -222,3 +214,67 @@ resources:
     mimeType: application/json
     handler:
       type: webservices
+
+  - uri: "loxone://docs/diagnostic-scenarios"
+    name: Diagnostic Scenarios
+    description: >
+      Step-by-step diagnostic workflows for common Loxone troubleshooting scenarios.
+      Each scenario lists symptoms, the sequence of API calls to make, and how to
+      interpret the results. Use this as a guide when something seems wrong with the
+      Miniserver, a control, or a connected device.
+    mimeType: application/json
+    handler:
+      type: diagnostic_scenarios
+
+  - uri: "loxone://system/log"
+    name: System Log
+    description: >
+      Tail of the Miniserver system log (def.log from the SD card).
+      Useful for diagnosing errors, warnings, and recent events.
+      Append ?lines=N to limit output (default: 200 lines).
+    mimeType: text/plain
+    handler:
+      type: system_log
+
+  - uri: "loxone://controls/with-statistics"
+    name: Controls with Statistics
+    description: >
+      List of all Loxone controls that have statistics configured (v1 or v2).
+      Use this to discover which controls you can query via loxone://statistics.
+      Each entry shows the control UUID, name, type, room, and statistic version.
+    mimeType: application/json
+    handler:
+      type: devices_with_statistics
+
+  - uri: "loxone://system/status"
+    name: System Status
+    description: >
+      Aggregated read-only health snapshot of the Miniserver.
+      Calls dev/sps/state, dev/sys/cpu, dev/sys/heap, dev/sps/status,
+      dev/cfg/version, dev/sys/time, dev/cfg/ip, dev/cfg/dns1, dev/cfg/ntp
+      and returns structured JSON with parsed values and health flags.
+      Use this as the first step in any diagnostic workflow before reaching
+      for the send_miniserver_command tool.
+    mimeType: application/json
+    handler:
+      type: system_status
+
+  - uri: "loxone://devices"
+    name: Physical Devices
+    description: >
+      List physical Loxone hardware devices: Miniserver, Extensions, Tree devices, Air devices, and network peripherals.
+      Supports query parameters: ?name=, ?serial=, ?version=, ?type=, ?online_only=true.
+      Use to check which hardware is online or offline and inspect firmware versions.
+    mimeType: application/json
+    handler:
+      type: physical_devices
+
+  - uri: "loxone://system/stats"
+    name: System Statistics
+    description: >
+      Raw Miniserver system statistics (stats endpoint).
+      Returns performance counters and system load history.
+      Useful for investigating recurring high CPU or memory issues.
+    mimeType: text/plain
+    handler:
+      type: system_stats
