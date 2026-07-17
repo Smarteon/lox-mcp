@@ -193,10 +193,12 @@ tasks {
     }
 }
 
+tasks.matching { it.name == "compileCommonMainKotlinMetadata" }.configureEach { dependsOn("generateVersionFile") }
+tasks.matching { it.name == "compileLinuxMainKotlinMetadata" }.configureEach { dependsOn("embedResources") }
 tasks.named("compileKotlinJvm") { dependsOn("generateVersionFile") }
 tasks.named("compileKotlinLinuxX64") { dependsOn("generateVersionFile", "embedResources") }
 tasks.named("compileKotlinLinuxArm64") { dependsOn("generateVersionFile", "embedResources") }
 
-tasks.named("jvmProcessResources") { dependsOn("copyLoxoneDocs") }
+tasks.matching { it.name.endsWith("ProcessResources") }.configureEach { dependsOn("copyLoxoneDocs") }
 tasks.named("linuxX64ProcessResources") { dependsOn("copyLoxoneDocs") }
 tasks.named("linuxArm64ProcessResources") { dependsOn("copyLoxoneDocs") }
