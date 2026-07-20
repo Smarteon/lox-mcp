@@ -105,6 +105,9 @@ tools:
       See loxone://webservices for the full list of available paths.
       Examples: "dev/sps/state", "dev/sys/cpu", "dev/sys/heap", "dev/cfg/version",
       "dev/sps/enumdev", "data/status", "stats"
+      DANGEROUS paths (require explicit user confirmation before calling):
+      "dev/sys/reboot" — reboots the Miniserver, disconnects all clients;
+      "dev/sps/restart" — restarts the PLC, all controls temporarily unavailable.
     parameters:
       - name: path
         type: string
