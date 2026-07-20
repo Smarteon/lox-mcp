@@ -25,6 +25,9 @@ import io.ktor.http.decodeURLPart
 import io.modelcontextprotocol.kotlin.sdk.types.ReadResourceResult
 import io.modelcontextprotocol.kotlin.sdk.types.TextResourceContents
 import kotlinx.datetime.Instant
+import kotlinx.coroutines.async
+import kotlinx.coroutines.awaitAll
+import kotlinx.coroutines.coroutineScope
 import kotlinx.serialization.json.Json
 import kotlinx.serialization.json.JsonArray
 import kotlinx.serialization.json.JsonElement
@@ -506,15 +509,28 @@ class DynamicResourceHandler(
         fun parseValue(response: String): String =
             Regex("""value="([^"]+)"""").find(response)?.groupValues?.get(1) ?: response.trim()
 
-        val plcStateRaw = parseValue(adapter.sendRawCommand("dev/sps/state")).toIntOrNull() ?: -1
-        val cpuRaw = parseValue(adapter.sendRawCommand("dev/sys/cpu")).toIntOrNull() ?: -1
-        val heapRaw = parseValue(adapter.sendRawCommand("dev/sys/heap")).toLongOrNull() ?: -1L
-        val cycleStatus = parseValue(adapter.sendRawCommand("dev/sps/status"))
-        val version = parseValue(adapter.sendRawCommand("dev/cfg/version"))
-        val systemTime = parseValue(adapter.sendRawCommand("dev/sys/time"))
-        val ip = parseValue(adapter.sendRawCommand("dev/cfg/ip"))
-        val dns = parseValue(adapter.sendRawCommand("dev/cfg/dns1"))
-        val ntp = parseValue(adapter.sendRawCommand("dev/cfg/ntp"))
+        val raw = coroutineScope {
+            awaitAll(
+                async { parseValue(adapter.sendRawCommand("dev/sps/state")) },
+                async { parseValue(adapter.sendRawCommand("dev/sys/cpu")) },
+                async { parseValue(adapter.sendRawCommand("dev/sys/heap")) },
+                async { parseValue(adapter.sendRawCommand("dev/sps/status")) },
+                async { parseValue(adapter.sendRawCommand("dev/cfg/version")) },
+                async { parseValue(adapter.sendRawCommand("dev/sys/time")) },
+                async { parseValue(adapter.sendRawCommand("dev/cfg/ip")) },
+                async { parseValue(adapter.sendRawCommand("dev/cfg/dns1")) },
+                async { parseValue(adapter.sendRawCommand("dev/cfg/ntp")) }
+            )
+        }
+        val plcStateRaw = raw[0].toIntOrNull() ?: -1
+        val cpuRaw = raw[1].toIntOrNull() ?: -1
+        val heapRaw = raw[2].toLongOrNull() ?: -1L
+        val cycleStatus = raw[3]
+        val version = raw[4]
+        val systemTime = raw[5]
+        val ip = raw[6]
+        val dns = raw[7]
+        val ntp = raw[8]
 
         val plcStateLabel = when (plcStateRaw) {
             0 -> "none"; 1 -> "starting"; 2 -> "loaded"; 3 -> "started"
@@ -544,7 +560,7 @@ class DynamicResourceHandler(
             }
         }
 
-        return successResult(uri, result.toString(), resourceConfig.mimeType)
+        return successResult(uri, json.encodeToString(JsonObject.serializer(), result), resourceConfig.mimeType)
     }
 
     private suspend fun handlePhysicalDevices(uri: String): ReadResourceResult {
