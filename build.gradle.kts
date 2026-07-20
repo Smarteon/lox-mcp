@@ -129,6 +129,7 @@ tasks {
             layout.projectDirectory.file("loxone-docs/versions.json"),
             layout.projectDirectory.file("loxone-docs/structure-file-16.0.json"),
             layout.projectDirectory.file("loxone-docs/webservices.json"),
+            layout.projectDirectory.file("loxone-docs/diagnostic-scenarios.json"),
             layout.projectDirectory.file("src/commonMain/resources/mcp-config.yaml")
         )
         outputs.dir(outputDir)
@@ -138,7 +139,8 @@ tasks {
                 "mcp-config.yaml" to layout.projectDirectory.file("src/commonMain/resources/mcp-config.yaml").asFile,
                 "/loxone-docs/versions.json" to layout.projectDirectory.file("loxone-docs/versions.json").asFile,
                 "/loxone-docs/structure-file-16.0.json" to layout.projectDirectory.file("loxone-docs/structure-file-16.0.json").asFile,
-                "/loxone-docs/webservices.json" to layout.projectDirectory.file("loxone-docs/webservices.json").asFile
+                "/loxone-docs/webservices.json" to layout.projectDirectory.file("loxone-docs/webservices.json").asFile,
+                "/loxone-docs/diagnostic-scenarios.json" to layout.projectDirectory.file("loxone-docs/diagnostic-scenarios.json").asFile
             )
 
             val sb = StringBuilder()
